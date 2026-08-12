@@ -87,8 +87,14 @@ export async function deleteSite(siteId: string, confirmName: string) {
   if (fetchError) throw new Error(fetchError.message);
   if (confirmName !== site.name) throw new Error("Typed name doesn't match. Delete cancelled.");
 
-  const { error } = await supabase.from("sites").delete().eq("id", siteId);
+  // .select() here is deliberate: without it, a DELETE blocked by RLS (e.g. a
+  // missing delete policy) returns no error and an empty response, so a
+  // silently-skipped delete would look identical to a successful one.
+  const { data: deleted, error } = await supabase.from("sites").delete().eq("id", siteId).select("id");
   if (error) throw new Error(error.message);
+  if (!deleted || deleted.length === 0) {
+    throw new Error("Delete did not go through (no row was removed). Nothing was deleted.");
+  }
 
   revalidatePath("/sites");
   return { name: site.name };

@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Copy, Plus, Trash2 } from "lucide-react";
 import { createSite, toggleSiteActive, toggleSiteModule, setSiteDomain, deleteSite } from "@/app/(dashboard)/sites/actions";
 import { MODULE_KEYS } from "@/lib/dashboard/modules";
+import type { SiteRecord } from "@/lib/dashboard/site";
 
 export function NewSiteForm() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -219,7 +220,15 @@ export function AddDomainForm({ siteId }: { siteId: string }) {
   );
 }
 
-export function DeleteSiteButton({ siteId, siteName }: { siteId: string; siteName: string }) {
+export function DeleteSiteButton({
+  siteId,
+  siteName,
+  onDeleted,
+}: {
+  siteId: string;
+  siteName: string;
+  onDeleted: (name: string) => void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -231,13 +240,34 @@ export function DeleteSiteButton({ siteId, siteName }: { siteId: string; siteNam
         <Trash2 className="h-3.5 w-3.5" />
         Delete site
       </button>
-      {open && <DeleteSiteDialog siteId={siteId} siteName={siteName} onClose={() => setOpen(false)} />}
+      {open && (
+        <DeleteSiteDialog
+          siteId={siteId}
+          siteName={siteName}
+          onClose={() => setOpen(false)}
+          onDeleted={(name) => {
+            setOpen(false);
+            onDeleted(name);
+          }}
+        />
+      )}
     </>
   );
 }
 
-function DeleteSiteDialog({ siteId, siteName, onClose }: { siteId: string; siteName: string; onClose: () => void }) {
+function DeleteSiteDialog({
+  siteId,
+  siteName,
+  onClose,
+  onDeleted,
+}: {
+  siteId: string;
+  siteName: string;
+  onClose: () => void;
+  onDeleted: (name: string) => void;
+}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -249,7 +279,23 @@ function DeleteSiteDialog({ siteId, siteName, onClose }: { siteId: string; siteN
     startTransition(async () => {
       try {
         const { name } = await deleteSite(siteId, typed);
-        router.push(`/sites?deleted=${encodeURIComponent(name)}`);
+
+        // If the deleted site was the one selected in the URL, drop it so
+        // the Topbar/Sidebar fall back to another site instead of pointing
+        // at an id that no longer exists.
+        if (searchParams.get("site") === siteId) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.delete("site");
+          const query = params.toString();
+          router.replace(query ? `/sites?${query}` : "/sites");
+        }
+
+        // revalidatePath("/sites") in the server action only marks the route
+        // stale; router.refresh() is what actually forces this route's
+        // Server Components -- including the shared layout that feeds the
+        // Topbar/Sidebar site list -- to refetch now, without a manual reload.
+        router.refresh();
+        onDeleted(name);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete site.");
       }
@@ -295,6 +341,69 @@ function DeleteSiteDialog({ siteId, siteName, onClose }: { siteId: string; siteN
             Cancel
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function SitesList({ sites, appUrl }: { sites: SiteRecord[]; appUrl: string }) {
+  const [deletedName, setDeletedName] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-6">
+      {deletedName && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          &quot;{deletedName}&quot; and all of its data were deleted.
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {sites.length === 0 && <p className="text-sm text-[var(--muted)]">No sites yet. Create one above.</p>}
+        {sites.map((site) => {
+          const snippet = `<script defer src="${appUrl}/tracker.js" data-site="${site.site_key}"></script>`;
+          return (
+            <div key={site.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold text-[var(--foreground)]">{site.name}</h2>
+                    <ActiveToggle siteId={site.id} active={site.active} />
+                  </div>
+                  <p className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                    {site.domain ? (
+                      <span>{site.domain}</span>
+                    ) : (
+                      <>
+                        <span>No domain (podcast-only)</span>
+                        <AddDomainForm siteId={site.id} />
+                      </>
+                    )}
+                    <span>· {site.timezone}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Modules</span>
+                <ModulesEditor siteId={site.id} activeModules={site.modules} hasDomain={!!site.domain} />
+              </div>
+
+              {site.domain && (
+                <div className="mt-4 rounded-lg bg-gray-50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Tracker snippet</span>
+                    <CopySnippetButton snippet={snippet} />
+                  </div>
+                  <pre className="overflow-x-auto text-xs text-[var(--foreground)]">{snippet}</pre>
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-3">
+                <DeleteSiteButton siteId={site.id} siteName={site.name} onDeleted={setDeletedName} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

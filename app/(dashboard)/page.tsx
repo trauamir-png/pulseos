@@ -25,7 +25,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-[var(--foreground)]">{site.name}</h1>
-        <p className="text-sm text-[var(--muted)]">{site.domain}</p>
+        <p className="text-sm text-[var(--muted)]">{site.domain ?? "No domain (podcast-only)"}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

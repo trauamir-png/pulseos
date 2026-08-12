@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 export interface SiteRecord {
   id: string;
   name: string;
-  domain: string;
+  /** null for podcast-only sites, which have no web domain to track. */
+  domain: string | null;
   site_key: string;
   timezone: string;
   active: boolean;

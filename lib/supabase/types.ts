@@ -5,7 +5,7 @@ export interface Database {
         Row: {
           id: string;
           name: string;
-          domain: string;
+          domain: string | null;
           site_key: string;
           timezone: string;
           active: boolean;
@@ -14,7 +14,7 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
-          domain: string;
+          domain?: string | null;
           site_key?: string;
           timezone?: string;
           active?: boolean;

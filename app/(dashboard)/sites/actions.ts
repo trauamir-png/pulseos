@@ -6,11 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function createSite(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
-  const domain = String(formData.get("domain") || "").trim().toLowerCase();
+  const domainInput = String(formData.get("domain") || "").trim().toLowerCase();
+  const domain = domainInput || null;
   const timezone = String(formData.get("timezone") || "UTC").trim();
 
-  if (!name || !domain) {
-    throw new Error("Name and domain are required.");
+  if (!name) {
+    throw new Error("Name is required.");
   }
 
   const supabase = await createClient();
@@ -29,9 +30,10 @@ export async function createSite(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // Domain-less sites are podcast-only: Web Analytics needs a domain, so it starts inactive.
   await supabase.from("site_modules").insert([
-    { site_id: site.id, module_key: "web_analytics", active: true },
-    { site_id: site.id, module_key: "podcast_analytics", active: false },
+    { site_id: site.id, module_key: "web_analytics", active: domain != null },
+    { site_id: site.id, module_key: "podcast_analytics", active: domain == null },
   ]);
 
   revalidatePath("/sites");
@@ -44,8 +46,25 @@ export async function toggleSiteActive(siteId: string, active: boolean) {
   revalidatePath("/sites");
 }
 
+export async function setSiteDomain(siteId: string, domain: string) {
+  const trimmed = domain.trim().toLowerCase();
+  if (!trimmed) throw new Error("Domain is required.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("sites").update({ domain: trimmed }).eq("id", siteId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/sites");
+}
+
 export async function toggleSiteModule(siteId: string, moduleKey: string, active: boolean) {
   const supabase = await createClient();
+
+  if (moduleKey === "web_analytics" && active) {
+    const { data: site, error: siteError } = await supabase.from("sites").select("domain").eq("id", siteId).single();
+    if (siteError) throw new Error(siteError.message);
+    if (!site.domain) throw new Error("Add a domain to this site before enabling Web Analytics.");
+  }
+
   const { error } = await supabase
     .from("site_modules")
     .upsert({ site_id: siteId, module_key: moduleKey, active, updated_at: new Date().toISOString() }, { onConflict: "site_id,module_key" });

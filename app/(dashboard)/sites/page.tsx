@@ -1,5 +1,5 @@
 import { listSites } from "@/lib/dashboard/site";
-import { NewSiteForm, CopySnippetButton, ActiveToggle, ModulesEditor } from "@/components/site-actions";
+import { NewSiteForm, CopySnippetButton, ActiveToggle, ModulesEditor, AddDomainForm } from "@/components/site-actions";
 
 export default async function SitesPage() {
   const sites = await listSites();
@@ -27,24 +27,34 @@ export default async function SitesPage() {
                     <h2 className="text-base font-semibold text-[var(--foreground)]">{site.name}</h2>
                     <ActiveToggle siteId={site.id} active={site.active} />
                   </div>
-                  <p className="text-sm text-[var(--muted)]">
-                    {site.domain} · {site.timezone}
+                  <p className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                    {site.domain ? (
+                      <span>{site.domain}</span>
+                    ) : (
+                      <>
+                        <span>No domain (podcast-only)</span>
+                        <AddDomainForm siteId={site.id} />
+                      </>
+                    )}
+                    <span>· {site.timezone}</span>
                   </p>
                 </div>
               </div>
 
               <div className="mt-4">
                 <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Modules</span>
-                <ModulesEditor siteId={site.id} activeModules={site.modules} />
+                <ModulesEditor siteId={site.id} activeModules={site.modules} hasDomain={!!site.domain} />
               </div>
 
-              <div className="mt-4 rounded-lg bg-gray-50 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Tracker snippet</span>
-                  <CopySnippetButton snippet={snippet} />
+              {site.domain && (
+                <div className="mt-4 rounded-lg bg-gray-50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Tracker snippet</span>
+                    <CopySnippetButton snippet={snippet} />
+                  </div>
+                  <pre className="overflow-x-auto text-xs text-[var(--foreground)]">{snippet}</pre>
                 </div>
-                <pre className="overflow-x-auto text-xs text-[var(--foreground)]">{snippet}</pre>
-              </div>
+              )}
             </div>
           );
         })}

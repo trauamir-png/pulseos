@@ -9,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
       <Suspense fallback={null}>
-        <Sidebar />
+        <Sidebar sites={sites} />
       </Suspense>
       <div className="flex min-h-screen flex-1 flex-col">
         <Suspense fallback={<div className="h-[57px] border-b border-[var(--border)] bg-[var(--surface)]" />}>

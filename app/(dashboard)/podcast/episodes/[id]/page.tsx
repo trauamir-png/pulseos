@@ -1,0 +1,193 @@
+import Link from "next/link";
+import { format } from "date-fns-tz";
+import { createClient } from "@/lib/supabase/server";
+import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
+import { requireModule } from "@/lib/dashboard/modules";
+import { getEpisodeById } from "@/lib/dashboard/podcast";
+import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
+import { KpiCard } from "@/components/kpi-card";
+
+function formatSeconds(seconds: number | null): string {
+  if (seconds == null) return "–";
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const FUNNEL_STEPS = [
+  { key: "started", label: "Started" },
+  { key: "p25", label: "25%" },
+  { key: "p50", label: "50%" },
+  { key: "p75", label: "75%" },
+  { key: "p100", label: "100%" },
+] as const;
+
+export default async function EpisodeDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<DashboardSearchParams>;
+}) {
+  const { id } = await params;
+  const searchParamsResolved = await searchParams;
+  const { site, range } = await resolveDashboardContext(searchParamsResolved);
+  requireModule(site, "podcast_analytics");
+
+  const supabase = await createClient();
+  const episode = await getEpisodeById(supabase, site.id, id);
+
+  if (!episode) {
+    return (
+      <div className="space-y-6">
+        <Link href="/podcast/episodes" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+          ← Episodes
+        </Link>
+        <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-24 text-center">
+          <p className="text-lg font-medium text-[var(--foreground)]">Episode not found</p>
+          <p className="max-w-sm text-sm text-[var(--muted)]">This episode doesn&apos;t exist or no longer belongs to {site.name}.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const detail = await getEpisodeDetail(supabase, site.id, episode.id, range.from, range.to);
+  const noData = detail.overview.listens === 0;
+
+  return (
+    <div className="space-y-6">
+      <Link href="/podcast/episodes" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+        ← Episodes
+      </Link>
+
+      <div>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">
+          {episode.episodeNumber != null ? `#${episode.episodeNumber} · ` : ""}
+          {episode.title}
+        </h1>
+        <p className="text-sm text-[var(--muted)]">
+          {episode.publishedAt ? format(new Date(episode.publishedAt), "MMM d, yyyy", { timeZone: range.timezone }) : "Unpublished"} ·{" "}
+          {formatSeconds(episode.durationSeconds)}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard label="Listens" value={detail.overview.listens.toLocaleString()} />
+        <KpiCard label="Unique Listeners" value={detail.overview.uniqueListeners.toLocaleString()} />
+        <KpiCard label="Avg Listening Time" value={formatSeconds(detail.overview.avgListeningSeconds)} />
+        <KpiCard label="Completion Rate" value={detail.overview.completionRate.toFixed(1)} suffix="%" />
+      </div>
+
+      {noData ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 text-center">
+          <p className="text-lg font-medium text-[var(--foreground)]">No listening data yet</p>
+          <p className="max-w-sm text-sm text-[var(--muted)]">Once listeners play this episode, its funnel, sources, and platform activity will show up here.</p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Listening funnel</h2>
+            <p className="mb-4 text-xs text-[var(--muted)]">Based on 25% listening milestones — the finest granularity available in V1.</p>
+            <div className="space-y-2">
+              {FUNNEL_STEPS.map((step) => {
+                const value = detail.funnel[step.key];
+                const pct = detail.funnel.started > 0 ? (value / detail.funnel.started) * 100 : 0;
+                return (
+                  <div key={step.key} className="flex items-center gap-3">
+                    <span className="w-16 shrink-0 text-xs font-medium text-[var(--muted)]">{step.label}</span>
+                    <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-100">
+                      <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-12 shrink-0 text-right text-xs font-medium text-[var(--foreground)]">{value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Sources</h2>
+              {detail.sources.length === 0 ? (
+                <p className="py-8 text-center text-sm text-[var(--muted)]">No source data yet.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                      <th className="pb-2">Source</th>
+                      <th className="pb-2">Visitors</th>
+                      <th className="pb-2">Listen starts</th>
+                      <th className="pb-2">Avg time</th>
+                      <th className="pb-2">Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.sources.map((s) => (
+                      <tr key={s.source} className="border-t border-[var(--border)]">
+                        <td className="py-2 capitalize text-[var(--foreground)]">{s.source}</td>
+                        <td className="py-2 text-[var(--foreground)]">{s.visitors.toLocaleString()}</td>
+                        <td className="py-2 text-[var(--foreground)]">{s.listenStarts.toLocaleString()}</td>
+                        <td className="py-2 text-[var(--foreground)]">{formatSeconds(s.avgListeningSeconds)}</td>
+                        <td className="py-2 text-[var(--foreground)]">{s.completionRate.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Platforms</h2>
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Measured listens</p>
+                  {detail.platforms.measured.map((p) => (
+                    <div key={p.platform} className="flex items-center justify-between py-1 text-sm">
+                      <span className="text-[var(--foreground)]">{p.platform}</span>
+                      <span className="font-medium text-[var(--foreground)]">{p.listens.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Outbound clicks (not listens)</p>
+                  {detail.platforms.outboundClicks.map((p) => (
+                    <div key={p.platform} className="flex items-center justify-between py-1 text-sm">
+                      <span className="text-[var(--foreground)]">{p.platform}</span>
+                      <span className="font-medium text-[var(--foreground)]">{p.clicks.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Recent activity</h2>
+            {detail.recentActivity.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--muted)]">No recent events.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                    <th className="pb-2">Event</th>
+                    <th className="pb-2">Source</th>
+                    <th className="pb-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.recentActivity.map((a, i) => (
+                    <tr key={i} className="border-t border-[var(--border)]">
+                      <td className="py-2 text-[var(--foreground)]">{a.eventName}</td>
+                      <td className="py-2 capitalize text-[var(--foreground)]">{a.trafficSource}</td>
+                      <td className="py-2 text-[var(--muted)]">{format(new Date(a.occurredAt), "MMM d, HH:mm", { timeZone: range.timezone })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

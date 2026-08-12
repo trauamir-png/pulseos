@@ -144,6 +144,115 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["daily_salts"]["Insert"]>;
         Relationships: [];
       };
+      site_modules: {
+        Row: {
+          site_id: string;
+          module_key: string;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          site_id: string;
+          module_key: string;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["site_modules"]["Insert"]>;
+        Relationships: [];
+      };
+      podcasts: {
+        Row: {
+          id: string;
+          site_id: string;
+          name: string;
+          description: string | null;
+          artwork_url: string | null;
+          website_url: string | null;
+          rss_url: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          name: string;
+          description?: string | null;
+          artwork_url?: string | null;
+          website_url?: string | null;
+          rss_url?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podcasts"]["Insert"]>;
+        Relationships: [];
+      };
+      episodes: {
+        Row: {
+          id: string;
+          podcast_id: string;
+          title: string;
+          episode_number: number | null;
+          description: string | null;
+          published_at: string | null;
+          duration_seconds: number | null;
+          artwork_url: string | null;
+          page_url: string | null;
+          audio_url: string | null;
+          spotify_url: string | null;
+          apple_podcasts_url: string | null;
+          youtube_url: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          podcast_id: string;
+          title: string;
+          episode_number?: number | null;
+          description?: string | null;
+          published_at?: string | null;
+          duration_seconds?: number | null;
+          artwork_url?: string | null;
+          page_url?: string | null;
+          audio_url?: string | null;
+          spotify_url?: string | null;
+          apple_podcasts_url?: string | null;
+          youtube_url?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["episodes"]["Insert"]>;
+        Relationships: [];
+      };
+      podcast_events: {
+        Row: {
+          id: number;
+          site_id: string;
+          podcast_id: string;
+          episode_id: string | null;
+          session_id: string;
+          visitor_hash: string;
+          event_name: string;
+          properties: Record<string, unknown>;
+          traffic_source: string;
+          occurred_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["podcast_events"]["Row"]> & {
+          site_id: string;
+          podcast_id: string;
+          session_id: string;
+          visitor_hash: string;
+          event_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podcast_events"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

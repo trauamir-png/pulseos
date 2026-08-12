@@ -1,0 +1,182 @@
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
+import { requireModule } from "@/lib/dashboard/modules";
+import { getPodcastsForSite } from "@/lib/dashboard/podcast";
+import {
+  getPodcastSummary,
+  getPodcastListeningTimeseries,
+  getTopEpisodes,
+  getPlatformsBreakdown,
+  getPodcastSourcesBreakdown,
+} from "@/lib/dashboard/podcast-queries";
+import { KpiCard } from "@/components/kpi-card";
+import { PodcastListeningChart } from "@/components/podcast-listening-chart";
+
+function formatSeconds(seconds: number | null): string {
+  if (seconds == null) return "–";
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export default async function PodcastOverviewPage({ searchParams }: { searchParams: Promise<DashboardSearchParams> }) {
+  const params = await searchParams;
+  const { site, range } = await resolveDashboardContext(params);
+  requireModule(site, "podcast_analytics");
+
+  const supabase = await createClient();
+  const podcasts = await getPodcastsForSite(supabase, site.id);
+
+  if (podcasts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--foreground)]">Podcast Analytics</h1>
+          <p className="text-sm text-[var(--muted)]">{site.name}</p>
+        </div>
+        <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-24 text-center">
+          <p className="text-lg font-medium text-[var(--foreground)]">No podcast configured yet</p>
+          <p className="max-w-sm text-sm text-[var(--muted)]">
+            This site doesn&apos;t have a podcast set up. Once a podcast and its episodes exist, listening data will appear here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const [summary, timeseries, topEpisodes, platforms, sources] = await Promise.all([
+    getPodcastSummary(supabase, site.id, range.from, range.to),
+    getPodcastListeningTimeseries(supabase, site.id, range.from, range.to, range.timezone, range.granularity, "listens"),
+    getTopEpisodes(supabase, site.id, range.from, range.to),
+    getPlatformsBreakdown(supabase, site.id, range.from, range.to),
+    getPodcastSourcesBreakdown(supabase, site.id, range.from, range.to),
+  ]);
+
+  const noData = summary.totalListens === 0 && summary.listeningNow === 0;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Podcast Analytics</h1>
+        <p className="text-sm text-[var(--muted)]">{site.name}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <KpiCard label="Total Listens" value={summary.totalListens.toLocaleString()} />
+        <KpiCard label="Unique Listeners" value={summary.uniqueListeners.toLocaleString()} />
+        <KpiCard label="Avg Listening Time" value={formatSeconds(summary.avgListeningSeconds)} />
+        <KpiCard label="Completion Rate" value={summary.completionRate.toFixed(1)} suffix="%" />
+        <KpiCard label="Listening Now" value={summary.listeningNow.toLocaleString()} />
+      </div>
+
+      {noData ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-24 text-center">
+          <p className="text-lg font-medium text-[var(--foreground)]">No listening data yet</p>
+          <p className="max-w-sm text-sm text-[var(--muted)]">
+            Once listeners start playing episodes, listens, sources, and platform activity will show up here.
+          </p>
+        </div>
+      ) : (
+        <>
+          <PodcastListeningChart
+            key={`${site.id}-${range.from.toISOString()}-${range.to.toISOString()}`}
+            siteId={site.id}
+            initialData={timeseries}
+          />
+
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Top Episodes</h2>
+            {topEpisodes.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--muted)]">No episode listens in this range yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                    <th className="pb-2">Episode</th>
+                    <th className="pb-2">Listens</th>
+                    <th className="pb-2">Unique listeners</th>
+                    <th className="pb-2">Avg listening time</th>
+                    <th className="pb-2">Completion rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topEpisodes.map((ep) => (
+                    <tr key={ep.episodeId} className="border-t border-[var(--border)]">
+                      <td className="py-2">
+                        <Link href={`/podcast/episodes/${ep.episodeId}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
+                          {ep.episodeNumber != null ? `#${ep.episodeNumber} · ` : ""}
+                          {ep.title}
+                        </Link>
+                      </td>
+                      <td className="py-2 text-[var(--foreground)]">{ep.listens.toLocaleString()}</td>
+                      <td className="py-2 text-[var(--foreground)]">{ep.uniqueListeners.toLocaleString()}</td>
+                      <td className="py-2 text-[var(--foreground)]">{formatSeconds(ep.avgListeningSeconds)}</td>
+                      <td className="py-2 text-[var(--foreground)]">{ep.completionRate.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Platforms</h2>
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Measured listens</p>
+                  {platforms.measured.map((p) => (
+                    <div key={p.platform} className="flex items-center justify-between py-1 text-sm">
+                      <span className="text-[var(--foreground)]">{p.platform}</span>
+                      <span className="font-medium text-[var(--foreground)]">{p.listens.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Outbound clicks (not listens)</p>
+                  {platforms.outboundClicks.map((p) => (
+                    <div key={p.platform} className="flex items-center justify-between py-1 text-sm">
+                      <span className="text-[var(--foreground)]">{p.platform}</span>
+                      <span className="font-medium text-[var(--foreground)]">{p.clicks.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Sources</h2>
+              {sources.length === 0 ? (
+                <p className="py-8 text-center text-sm text-[var(--muted)]">No source data in this range yet.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                      <th className="pb-2">Source</th>
+                      <th className="pb-2">Visitors</th>
+                      <th className="pb-2">Listen starts</th>
+                      <th className="pb-2">Avg time</th>
+                      <th className="pb-2">Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sources.map((s) => (
+                      <tr key={s.source} className="border-t border-[var(--border)]">
+                        <td className="py-2 capitalize text-[var(--foreground)]">{s.source}</td>
+                        <td className="py-2 text-[var(--foreground)]">{s.visitors.toLocaleString()}</td>
+                        <td className="py-2 text-[var(--foreground)]">{s.listenStarts.toLocaleString()}</td>
+                        <td className="py-2 text-[var(--foreground)]">{formatSeconds(s.avgListeningSeconds)}</td>
+                        <td className="py-2 text-[var(--foreground)]">{s.completionRate.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

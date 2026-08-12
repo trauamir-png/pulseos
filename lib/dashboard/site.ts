@@ -8,12 +8,25 @@ export interface SiteRecord {
   timezone: string;
   active: boolean;
   created_at: string;
+  /** Active module keys for this site, e.g. ["web_analytics"]. */
+  modules: string[];
 }
 
 export async function listSites(): Promise<SiteRecord[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("sites").select("*").order("created_at", { ascending: true });
-  return data ?? [];
+  const [{ data: sites }, { data: modules }] = await Promise.all([
+    supabase.from("sites").select("*").order("created_at", { ascending: true }),
+    supabase.from("site_modules").select("site_id, module_key, active").eq("active", true),
+  ]);
+
+  const modulesBySite = new Map<string, string[]>();
+  for (const row of modules ?? []) {
+    const list = modulesBySite.get(row.site_id) ?? [];
+    list.push(row.module_key);
+    modulesBySite.set(row.site_id, list);
+  }
+
+  return (sites ?? []).map((site) => ({ ...site, modules: modulesBySite.get(site.id) ?? [] }));
 }
 
 /** Resolves the site to show: the one requested via ?site=, or the first active site. */

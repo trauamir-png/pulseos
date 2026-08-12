@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Check, Copy, Plus } from "lucide-react";
-import { createSite, toggleSiteActive } from "@/app/(dashboard)/sites/actions";
+import { createSite, toggleSiteActive, toggleSiteModule } from "@/app/(dashboard)/sites/actions";
+import { MODULE_KEYS } from "@/lib/dashboard/modules";
 
 export function NewSiteForm() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -118,5 +119,36 @@ export function ActiveToggle({ siteId, active }: { siteId: string; active: boole
     >
       {active ? "Active" : "Inactive"}
     </button>
+  );
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  web_analytics: "Web Analytics",
+  podcast_analytics: "Podcast Analytics",
+};
+
+export function ModulesEditor({ siteId, activeModules }: { siteId: string; activeModules: string[] }) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {MODULE_KEYS.map((key) => {
+        const active = activeModules.includes(key);
+        return (
+          <button
+            key={key}
+            disabled={pending}
+            onClick={() => startTransition(() => toggleSiteModule(siteId, key, !active))}
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-60 ${
+              active
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "border-[var(--border)] bg-white text-[var(--muted)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            {MODULE_LABELS[key] ?? key} · {active ? "On" : "Off"}
+          </button>
+        );
+      })}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { listSites } from "@/lib/dashboard/site";
-import { NewSiteForm, CopySnippetButton, ActiveToggle } from "@/components/site-actions";
+import { NewSiteForm, CopySnippetButton, ActiveToggle, ModulesEditor } from "@/components/site-actions";
 
 export default async function SitesPage() {
   const sites = await listSites();
@@ -31,6 +31,11 @@ export default async function SitesPage() {
                     {site.domain} · {site.timezone}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Modules</span>
+                <ModulesEditor siteId={site.id} activeModules={site.modules} />
               </div>
 
               <div className="mt-4 rounded-lg bg-gray-50 p-3">

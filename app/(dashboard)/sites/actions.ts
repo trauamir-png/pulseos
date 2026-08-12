@@ -71,3 +71,25 @@ export async function toggleSiteModule(siteId: string, moduleKey: string, active
   if (error) throw new Error(error.message);
   revalidatePath("/sites");
 }
+
+/**
+ * Deletes a site and everything scoped to it. Every table referencing sites
+ * (directly or transitively via sessions/podcasts/episodes) has ON DELETE
+ * CASCADE, so a single delete on `sites` removes all related rows at the DB
+ * level -- see supabase/migrations/0001_init.sql and 0003_podcast_analytics.sql.
+ * confirmName is re-checked server-side against the real name so a client
+ * bypass can't skip confirmation.
+ */
+export async function deleteSite(siteId: string, confirmName: string) {
+  const supabase = await createClient();
+
+  const { data: site, error: fetchError } = await supabase.from("sites").select("name").eq("id", siteId).single();
+  if (fetchError) throw new Error(fetchError.message);
+  if (confirmName !== site.name) throw new Error("Typed name doesn't match. Delete cancelled.");
+
+  const { error } = await supabase.from("sites").delete().eq("id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/sites");
+  return { name: site.name };
+}

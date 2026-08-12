@@ -1,12 +1,19 @@
 import { listSites } from "@/lib/dashboard/site";
-import { NewSiteForm, CopySnippetButton, ActiveToggle, ModulesEditor, AddDomainForm } from "@/components/site-actions";
+import { NewSiteForm, CopySnippetButton, ActiveToggle, ModulesEditor, AddDomainForm, DeleteSiteButton } from "@/components/site-actions";
 
-export default async function SitesPage() {
+export default async function SitesPage({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   const sites = await listSites();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://YOUR-PULSEOS-DOMAIN";
 
   return (
     <div className="space-y-6">
+      {deleted && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          &quot;{deleted}&quot; and all of its data were deleted.
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--foreground)]">Sites</h1>
@@ -55,6 +62,10 @@ export default async function SitesPage() {
                   <pre className="overflow-x-auto text-xs text-[var(--foreground)]">{snippet}</pre>
                 </div>
               )}
+
+              <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-3">
+                <DeleteSiteButton siteId={site.id} siteName={site.name} />
+              </div>
             </div>
           );
         })}

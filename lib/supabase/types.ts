@@ -176,6 +176,10 @@ export interface Database {
           rss_last_synced_at: string | null;
           rss_last_sync_status: string | null;
           rss_last_error: string | null;
+          podbean_podcast_id: string | null;
+          podbean_last_synced_at: string | null;
+          podbean_last_sync_status: string | null;
+          podbean_last_error: string | null;
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -193,6 +197,10 @@ export interface Database {
           rss_last_synced_at?: string | null;
           rss_last_sync_status?: string | null;
           rss_last_error?: string | null;
+          podbean_podcast_id?: string | null;
+          podbean_last_synced_at?: string | null;
+          podbean_last_sync_status?: string | null;
+          podbean_last_error?: string | null;
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -218,6 +226,7 @@ export interface Database {
           rss_guid: string | null;
           season_number: number | null;
           explicit: boolean | null;
+          podbean_episode_id: string | null;
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -239,6 +248,7 @@ export interface Database {
           rss_guid?: string | null;
           season_number?: number | null;
           explicit?: boolean | null;
+          podbean_episode_id?: string | null;
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -267,6 +277,122 @@ export interface Database {
           event_name: string;
         };
         Update: Partial<Database["public"]["Tables"]["podcast_events"]["Row"]>;
+        Relationships: [];
+      };
+      podbean_podcast_daily_downloads: {
+        Row: {
+          podcast_id: string;
+          stat_date: string;
+          downloads: number;
+          synced_at: string;
+        };
+        Insert: {
+          podcast_id: string;
+          stat_date: string;
+          downloads: number;
+          synced_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podbean_podcast_daily_downloads"]["Insert"]>;
+        Relationships: [];
+      };
+      podbean_episode_daily_downloads: {
+        Row: {
+          episode_id: string;
+          podcast_id: string;
+          stat_date: string;
+          downloads: number;
+          synced_at: string;
+        };
+        Insert: {
+          episode_id: string;
+          podcast_id: string;
+          stat_date: string;
+          downloads: number;
+          synced_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podbean_episode_daily_downloads"]["Insert"]>;
+        Relationships: [];
+      };
+      podbean_podcast_monthly_downloads: {
+        Row: {
+          podcast_id: string;
+          month_start: string;
+          downloads: number;
+          synced_at: string;
+        };
+        Insert: {
+          podcast_id: string;
+          month_start: string;
+          downloads: number;
+          synced_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podbean_podcast_monthly_downloads"]["Insert"]>;
+        Relationships: [];
+      };
+      podbean_episode_monthly_downloads: {
+        Row: {
+          episode_id: string;
+          podcast_id: string;
+          month_start: string;
+          downloads: number;
+          synced_at: string;
+        };
+        Insert: {
+          episode_id: string;
+          podcast_id: string;
+          month_start: string;
+          downloads: number;
+          synced_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podbean_episode_monthly_downloads"]["Insert"]>;
+        Relationships: [];
+      };
+      podbean_dimension_stats: {
+        Row: {
+          id: number;
+          podcast_id: string;
+          dimension: "country" | "platform" | "source";
+          dimension_key: string;
+          granularity: "day" | "month";
+          bucket_start: string;
+          downloads: number;
+          synced_at: string;
+        };
+        Insert: {
+          id?: number;
+          podcast_id: string;
+          dimension: "country" | "platform" | "source";
+          dimension_key: string;
+          granularity: "day" | "month";
+          bucket_start: string;
+          downloads: number;
+          synced_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podbean_dimension_stats"]["Insert"]>;
+        Relationships: [];
+      };
+      podbean_episode_engagement_daily: {
+        Row: {
+          episode_id: string;
+          podcast_id: string;
+          stat_date: string;
+          listeners: number;
+          engaged_listeners: number;
+          average_consumption_rate: number | null;
+          average_consumption_time_seconds: number | null;
+          synced_at: string;
+        };
+        Insert: {
+          episode_id: string;
+          podcast_id: string;
+          stat_date: string;
+          listeners: number;
+          engaged_listeners: number;
+          average_consumption_rate?: number | null;
+          average_consumption_time_seconds?: number | null;
+          synced_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["podbean_episode_engagement_daily"]["Insert"]>;
         Relationships: [];
       };
     };

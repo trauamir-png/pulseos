@@ -10,9 +10,19 @@ import {
   getPlatformsBreakdown,
   getPodcastSourcesBreakdown,
 } from "@/lib/dashboard/podcast-queries";
+import {
+  getPodbeanDownloadsSummary,
+  getPodbeanDownloadsTimeseries,
+  getPodbeanMonthlyDownloadsHistory,
+  getPodbeanTopEpisodes,
+  getPodbeanDimensionsForRange,
+  getPodbeanDimensionsAllTimeMonthly,
+  getPodbeanEngagementSummary,
+} from "@/lib/dashboard/podbean-queries";
 import { KpiCard } from "@/components/kpi-card";
 import { PodcastListeningChart } from "@/components/podcast-listening-chart";
 import { ConnectPodcastForm, PodcastRssStatusCard } from "@/components/podcast-rss";
+import { PodbeanSection } from "@/components/podbean-section";
 
 function formatSeconds(seconds: number | null): string {
   if (seconds == null) return "–";
@@ -62,6 +72,58 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
   ]);
 
   const noData = summary.totalListens === 0 && summary.listeningNow === 0;
+
+  const podbeanSections = await Promise.all(
+    podcasts.map(async (podcast) => {
+      const [
+        mappedCountRes,
+        downloadsSummary,
+        downloadsTimeseries,
+        monthlyDownloadsHistory,
+        podbeanTopEpisodes,
+        countriesRange,
+        platformsRange,
+        sourcesRange,
+        countriesAllTime,
+        platformsAllTime,
+        sourcesAllTime,
+        engagement,
+      ] = await Promise.all([
+        supabase.from("episodes").select("id", { count: "exact", head: true }).eq("podcast_id", podcast.id).not("podbean_episode_id", "is", null),
+        getPodbeanDownloadsSummary(supabase, podcast.id, range.from, range.to),
+        getPodbeanDownloadsTimeseries(supabase, podcast.id, range.from, range.to),
+        getPodbeanMonthlyDownloadsHistory(supabase, podcast.id),
+        getPodbeanTopEpisodes(supabase, podcast.id, range.from, range.to),
+        getPodbeanDimensionsForRange(supabase, podcast.id, "country", range.from, range.to),
+        getPodbeanDimensionsForRange(supabase, podcast.id, "platform", range.from, range.to),
+        getPodbeanDimensionsForRange(supabase, podcast.id, "source", range.from, range.to),
+        getPodbeanDimensionsAllTimeMonthly(supabase, podcast.id, "country"),
+        getPodbeanDimensionsAllTimeMonthly(supabase, podcast.id, "platform"),
+        getPodbeanDimensionsAllTimeMonthly(supabase, podcast.id, "source"),
+        getPodbeanEngagementSummary(supabase, podcast.id),
+      ]);
+
+      return {
+        podcastId: podcast.id,
+        podcastName: podcast.name,
+        hasMappedEpisodes: (mappedCountRes.count ?? 0) > 0,
+        lastSyncedAt: podcast.podbeanLastSyncedAt,
+        lastSyncStatus: podcast.podbeanLastSyncStatus,
+        lastError: podcast.podbeanLastError,
+        downloadsSummary,
+        downloadsTimeseries,
+        monthlyDownloadsHistory,
+        topEpisodes: podbeanTopEpisodes,
+        countriesRange,
+        platformsRange,
+        sourcesRange,
+        countriesAllTime,
+        platformsAllTime,
+        sourcesAllTime,
+        engagement,
+      };
+    }),
+  );
 
   return (
     <div className="space-y-6">
@@ -191,6 +253,30 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
           </div>
         </>
       )}
+
+      <div className="space-y-4">
+        {podbeanSections.map((s) => (
+          <PodbeanSection
+            key={s.podcastId}
+            podcastName={s.podcastName}
+            hasMappedEpisodes={s.hasMappedEpisodes}
+            lastSyncedAt={s.lastSyncedAt}
+            lastSyncStatus={s.lastSyncStatus}
+            lastError={s.lastError}
+            downloadsSummary={s.downloadsSummary}
+            downloadsTimeseries={s.downloadsTimeseries}
+            monthlyDownloadsHistory={s.monthlyDownloadsHistory}
+            topEpisodes={s.topEpisodes}
+            engagement={s.engagement}
+            countriesRange={s.countriesRange}
+            platformsRange={s.platformsRange}
+            sourcesRange={s.sourcesRange}
+            countriesAllTime={s.countriesAllTime}
+            platformsAllTime={s.platformsAllTime}
+            sourcesAllTime={s.sourcesAllTime}
+          />
+        ))}
+      </div>
     </div>
   );
 }

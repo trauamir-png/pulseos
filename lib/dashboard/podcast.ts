@@ -16,6 +16,10 @@ export interface PodcastRecord {
   rssLastSyncedAt: string | null;
   rssLastSyncStatus: string | null;
   rssLastError: string | null;
+  podbeanPodcastId: string | null;
+  podbeanLastSyncedAt: string | null;
+  podbeanLastSyncStatus: string | null;
+  podbeanLastError: string | null;
 }
 
 export interface EpisodeMeta {
@@ -40,7 +44,9 @@ export interface EpisodeMeta {
 export async function getPodcastsForSite(supabase: Supa, siteId: string): Promise<PodcastRecord[]> {
   const { data } = await supabase
     .from("podcasts")
-    .select("id, site_id, name, description, artwork_url, website_url, rss_url, language, author, rss_last_synced_at, rss_last_sync_status, rss_last_error")
+    .select(
+      "id, site_id, name, description, artwork_url, website_url, rss_url, language, author, rss_last_synced_at, rss_last_sync_status, rss_last_error, podbean_podcast_id, podbean_last_synced_at, podbean_last_sync_status, podbean_last_error",
+    )
     .eq("site_id", siteId)
     .eq("active", true)
     .order("created_at", { ascending: true });
@@ -58,6 +64,10 @@ export async function getPodcastsForSite(supabase: Supa, siteId: string): Promis
     rssLastSyncedAt: p.rss_last_synced_at,
     rssLastSyncStatus: p.rss_last_sync_status,
     rssLastError: p.rss_last_error,
+    podbeanPodcastId: p.podbean_podcast_id,
+    podbeanLastSyncedAt: p.podbean_last_synced_at,
+    podbeanLastSyncStatus: p.podbean_last_sync_status,
+    podbeanLastError: p.podbean_last_error,
   }));
 }
 

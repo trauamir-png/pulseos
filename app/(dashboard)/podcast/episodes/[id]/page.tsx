@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
-import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
+import { resolveDashboardContext, dashboardQueryString, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodeById } from "@/lib/dashboard/podcast";
 import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
@@ -52,11 +52,12 @@ export default async function EpisodeDetailPage({
 
   const supabase = await createClient();
   const episode = await getEpisodeById(supabase, site.id, id);
+  const backQuery = dashboardQueryString({ siteId: site.id, range: searchParamsResolved.range, from: searchParamsResolved.from, to: searchParamsResolved.to });
 
   if (!episode) {
     return (
       <div className="space-y-6">
-        <Link href="/podcast/episodes" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+        <Link href={`/podcast/episodes${backQuery}`} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
           ← Episodes
         </Link>
         <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-24 text-center">
@@ -73,7 +74,7 @@ export default async function EpisodeDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/podcast/episodes" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+      <Link href={`/podcast/episodes${backQuery}`} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
         ← Episodes
       </Link>
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
+import { resolveDashboardContext, dashboardQueryString, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
 import { getPodcastsForSite, getEpisodesForSite } from "@/lib/dashboard/podcast";
 import {
@@ -72,6 +72,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
   ]);
 
   const noData = summary.totalListens === 0 && summary.listeningNow === 0;
+  const detailQuery = dashboardQueryString({ siteId: site.id, range: params.range, from: params.from, to: params.to });
 
   const podbeanSections = await Promise.all(
     podcasts.map(async (podcast) => {
@@ -207,7 +208,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
                   {topEpisodes.map((ep) => (
                     <tr key={ep.episodeId} className="border-t border-[var(--border)]">
                       <td className="py-2">
-                        <Link href={`/podcast/episodes/${ep.episodeId}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
+                        <Link href={`/podcast/episodes/${ep.episodeId}${detailQuery}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
                           {ep.episodeNumber != null ? `#${ep.episodeNumber} · ` : ""}
                           {ep.title}
                         </Link>

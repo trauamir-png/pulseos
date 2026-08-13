@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
-import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
+import { resolveDashboardContext, dashboardQueryString, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodesForSite } from "@/lib/dashboard/podcast";
 import { getPodbeanEpisodesMetrics } from "@/lib/dashboard/podbean-queries";
@@ -31,6 +31,7 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
 
   const podcastIds = Array.from(new Set(allEpisodes.map((ep) => ep.podcastId)));
   const podbeanMetrics = await getPodbeanEpisodesMetrics(supabase, podcastIds);
+  const detailQuery = dashboardQueryString({ siteId: site.id, range: params.range, from: params.from, to: params.to });
 
   return (
     <div className="space-y-6">
@@ -88,7 +89,7 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
                     </td>
                     <td className="px-4 py-3 text-[var(--muted)]">{ep.episodeNumber ?? "–"}</td>
                     <td className="px-4 py-3">
-                      <Link href={`/podcast/episodes/${ep.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
+                      <Link href={`/podcast/episodes/${ep.id}${detailQuery}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
                         {ep.title}
                       </Link>
                     </td>

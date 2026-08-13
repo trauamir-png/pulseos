@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { SiteRecord } from "@/lib/dashboard/site";
 
 /** Known module keys. New modules just need a row in `site_modules` -- nothing here is exhaustive by design. */
-export const MODULE_KEYS = ["web_analytics", "podcast_analytics"] as const;
+export const MODULE_KEYS = ["web_analytics", "podcast_analytics", "content_management"] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export function hasModule(site: SiteRecord | null, key: ModuleKey): boolean {

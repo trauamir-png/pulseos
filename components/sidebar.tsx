@@ -2,7 +2,22 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LayoutDashboard, Radio, FileText, Share2, Zap, Globe, Settings, Mic, ListMusic } from "lucide-react";
+import {
+  LayoutDashboard,
+  Radio,
+  FileText,
+  Share2,
+  Zap,
+  Globe,
+  Settings,
+  Mic,
+  ListMusic,
+  Newspaper,
+  Image as ImageIcon,
+  Users,
+  Tag,
+  GalleryHorizontal,
+} from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
 
@@ -17,6 +32,14 @@ const WEB_ANALYTICS_ITEMS = [
 const PODCAST_ANALYTICS_ITEMS = [
   { href: "/podcast", label: "Overview", icon: Mic },
   { href: "/podcast/episodes", label: "Episodes", icon: ListMusic },
+];
+
+const CONTENT_ITEMS = [
+  { href: "/content/columns", label: "Columns", icon: Newspaper },
+  { href: "/content/banners", label: "Banners", icon: GalleryHorizontal },
+  { href: "/content/media", label: "Media", icon: ImageIcon },
+  { href: "/content/authors", label: "Authors", icon: Users },
+  { href: "/content/categories", label: "Categories", icon: Tag },
 ];
 
 const GLOBAL_ITEMS = [
@@ -34,6 +57,7 @@ export function Sidebar({ sites }: { sites: SiteRecord[] }) {
 
   const showWebAnalytics = hasModule(site, "web_analytics");
   const showPodcastAnalytics = hasModule(site, "podcast_analytics");
+  const showContent = hasModule(site, "content_management");
 
   function renderLink(href: string, label: string, Icon: typeof LayoutDashboard) {
     const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -72,6 +96,13 @@ export function Sidebar({ sites }: { sites: SiteRecord[] }) {
           <div className="space-y-0.5">
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Podcast Analytics</p>
             {PODCAST_ANALYTICS_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}
+          </div>
+        )}
+
+        {showContent && (
+          <div className="space-y-0.5">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Content</p>
+            {CONTENT_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}
           </div>
         )}
 

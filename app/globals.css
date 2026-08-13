@@ -21,3 +21,46 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Rendered/edited Column body -- Tiptap editor output and public-facing
+   read-only rendering both use this class so the two stay visually in sync. */
+.column-body {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+.column-body > * + * {
+  margin-top: 0.9em;
+}
+.column-body h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+.column-body h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.column-body a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.column-body ul,
+.column-body ol {
+  padding-inline-start: 1.5em;
+}
+.column-body ul {
+  list-style: disc;
+}
+.column-body ol {
+  list-style: decimal;
+}
+.column-body blockquote {
+  border-inline-start: 3px solid var(--border);
+  padding-inline-start: 1em;
+  color: var(--muted);
+  font-style: italic;
+}
+.column-body img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+}

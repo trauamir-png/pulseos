@@ -126,6 +126,7 @@ export function ActiveToggle({ siteId, active }: { siteId: string; active: boole
 const MODULE_LABELS: Record<string, string> = {
   web_analytics: "Web Analytics",
   podcast_analytics: "Podcast Analytics",
+  content_management: "Content Management",
 };
 
 export function ModulesEditor({ siteId, activeModules, hasDomain }: { siteId: string; activeModules: string[]; hasDomain: boolean }) {

@@ -5,7 +5,7 @@ import { resolveDashboardContext, dashboardQueryString, type DashboardSearchPara
 import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodeById } from "@/lib/dashboard/podcast";
 import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
-import { getPodbeanEpisodesMetrics } from "@/lib/dashboard/podbean-queries";
+import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisode } from "@/lib/dashboard/podbean-queries";
 import { KpiCard } from "@/components/kpi-card";
 
 function formatSeconds(seconds: number | null): string {
@@ -70,7 +70,11 @@ export default async function EpisodeDetailPage({
 
   const detail = await getEpisodeDetail(supabase, site.id, episode.id, range.from, range.to);
   const noData = detail.overview.listens === 0;
-  const podbeanMetrics = (await getPodbeanEpisodesMetrics(supabase, [episode.podcastId])).get(episode.id) ?? null;
+  const [podbeanMetricsByEpisode, finalizedThrough] = await Promise.all([
+    getPodbeanEpisodesMetrics(supabase, [episode.podcastId]),
+    getPodbeanFinalizedThroughForEpisode(supabase, episode.id),
+  ]);
+  const podbeanMetrics = podbeanMetricsByEpisode.get(episode.id) ?? null;
 
   return (
     <div className="space-y-6">
@@ -132,6 +136,9 @@ export default async function EpisodeDetailPage({
               Avg consumption time: {formatSeconds(podbeanMetrics.avgConsumptionTimeSeconds)}
               {podbeanMetrics.engagementStatDate
                 ? ` · listener/engagement figures as of ${new Date(`${podbeanMetrics.engagementStatDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                : ""}
+              {finalizedThrough
+                ? ` · downloads finalized through ${new Date(`${finalizedThrough}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
                 : ""}
             </p>
           </>

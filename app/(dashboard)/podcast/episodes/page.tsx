@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveDashboardContext, dashboardQueryString, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodesForSite } from "@/lib/dashboard/podcast";
-import { getPodbeanEpisodesMetrics } from "@/lib/dashboard/podbean-queries";
+import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisodes } from "@/lib/dashboard/podbean-queries";
 import { EpisodesSearch } from "@/components/episodes-search";
 
 function formatSeconds(seconds: number | null): string {
@@ -30,7 +30,10 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
   const episodes = params.q ? allEpisodes.filter((ep) => ep.title.toLowerCase().includes(params.q!.toLowerCase())) : allEpisodes;
 
   const podcastIds = Array.from(new Set(allEpisodes.map((ep) => ep.podcastId)));
-  const podbeanMetrics = await getPodbeanEpisodesMetrics(supabase, podcastIds);
+  const [podbeanMetrics, finalizedThrough] = await Promise.all([
+    getPodbeanEpisodesMetrics(supabase, podcastIds),
+    getPodbeanFinalizedThroughForEpisodes(supabase, podcastIds),
+  ]);
   const detailQuery = dashboardQueryString({ siteId: site.id, range: params.range, from: params.from, to: params.to });
 
   return (
@@ -48,6 +51,7 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
         <p className="text-xs text-[var(--muted)]">
           Downloads and listener metrics below come from Podbean&apos;s hosting analytics. PulseOS Web Player metrics (plays, completion, outbound
           clicks) are shown on each episode&apos;s detail page.
+          {finalizedThrough ? ` Data finalized through ${format(new Date(`${finalizedThrough}T00:00:00Z`), "MMM d, yyyy", { timeZone: "UTC" })}.` : ""}
         </p>
       </div>
 

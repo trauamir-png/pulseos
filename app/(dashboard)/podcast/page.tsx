@@ -18,6 +18,7 @@ import {
   getPodbeanDimensionsForRange,
   getPodbeanDimensionsAllTimeMonthly,
   getPodbeanEngagementSummary,
+  getPodbeanFinalizedThroughForPodcast,
 } from "@/lib/dashboard/podbean-queries";
 import { KpiCard } from "@/components/kpi-card";
 import { PodcastListeningChart } from "@/components/podcast-listening-chart";
@@ -89,6 +90,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
         platformsAllTime,
         sourcesAllTime,
         engagement,
+        finalizedThrough,
       ] = await Promise.all([
         supabase.from("episodes").select("id", { count: "exact", head: true }).eq("podcast_id", podcast.id).not("podbean_episode_id", "is", null),
         getPodbeanDownloadsSummary(supabase, podcast.id, range.from, range.to),
@@ -102,6 +104,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
         getPodbeanDimensionsAllTimeMonthly(supabase, podcast.id, "platform"),
         getPodbeanDimensionsAllTimeMonthly(supabase, podcast.id, "source"),
         getPodbeanEngagementSummary(supabase, podcast.id),
+        getPodbeanFinalizedThroughForPodcast(supabase, podcast.id),
       ]);
 
       return {
@@ -122,6 +125,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
         platformsAllTime,
         sourcesAllTime,
         engagement,
+        finalizedThrough,
       };
     }),
   );
@@ -159,6 +163,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
             countriesAllTime={s.countriesAllTime}
             platformsAllTime={s.platformsAllTime}
             sourcesAllTime={s.sourcesAllTime}
+            finalizedThrough={s.finalizedThrough}
           />
         ))}
       </div>

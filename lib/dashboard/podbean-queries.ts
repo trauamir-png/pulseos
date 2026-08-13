@@ -245,6 +245,51 @@ export async function getPodbeanEpisodesMetrics(supabase: Supa, podcastIds: stri
   return result;
 }
 
+/**
+ * Latest calendar day for which Podbean's true daily-stats endpoint
+ * (period=d) has actually returned a finalized bucket -- i.e. MAX(stat_date)
+ * of what we've actually stored. Podbean only publishes a day's bucket once
+ * that day is over; "today" never has one yet, so this is always at least
+ * one day behind Podbean's own live dashboard counter. Never derived from
+ * podbean_last_synced_at (a sync *attempt* timestamp) -- that can be "today"
+ * even when Podbean gave us nothing new to store for today.
+ */
+export async function getPodbeanFinalizedThroughForPodcast(supabase: Supa, podcastId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("podbean_podcast_daily_downloads")
+    .select("stat_date")
+    .eq("podcast_id", podcastId)
+    .order("stat_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.stat_date ?? null;
+}
+
+/** Same as getPodbeanFinalizedThroughForPodcast, but across every mapped episode's own daily rows -- for a single label above an episode list rather than a per-row query per episode. */
+export async function getPodbeanFinalizedThroughForEpisodes(supabase: Supa, podcastIds: string[]): Promise<string | null> {
+  if (podcastIds.length === 0) return null;
+  const { data } = await supabase
+    .from("podbean_episode_daily_downloads")
+    .select("stat_date")
+    .in("podcast_id", podcastIds)
+    .order("stat_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.stat_date ?? null;
+}
+
+/** Per-episode variant -- an individual episode can lag the podcast-wide date (e.g. a mapping added after the last nightly run), so Episode Detail must use its own MAX(stat_date), not the podcast's. */
+export async function getPodbeanFinalizedThroughForEpisode(supabase: Supa, episodeId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("podbean_episode_daily_downloads")
+    .select("stat_date")
+    .eq("episode_id", episodeId)
+    .order("stat_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.stat_date ?? null;
+}
+
 export interface PodbeanEngagementSummary {
   listeners: number;
   engagedListeners: number;

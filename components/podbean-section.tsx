@@ -65,6 +65,7 @@ export interface PodbeanSectionProps {
   countriesAllTime: PodbeanDimensionRow[];
   platformsAllTime: PodbeanDimensionRow[];
   sourcesAllTime: PodbeanDimensionRow[];
+  finalizedThrough: string | null;
 }
 
 export function PodbeanSection(props: PodbeanSectionProps) {
@@ -85,6 +86,7 @@ export function PodbeanSection(props: PodbeanSectionProps) {
     countriesAllTime,
     platformsAllTime,
     sourcesAllTime,
+    finalizedThrough,
   } = props;
 
   const recentDays = downloadsTimeseries.slice(-14);
@@ -96,14 +98,17 @@ export function PodbeanSection(props: PodbeanSectionProps) {
           <span className="inline-flex items-center rounded-full bg-orange-600 px-2.5 py-0.5 text-xs font-semibold text-white">Podbean</span>
           <h2 className="text-sm font-semibold text-[var(--foreground)]">{podcastName} — Podbean Analytics</h2>
         </div>
-        <span className="text-xs text-[var(--muted)]">
-          {lastSyncStatus === "error" ? (
-            <span className="text-[var(--negative)]">Last sync failed{lastError ? `: ${lastError}` : ""}</span>
-          ) : lastSyncedAt ? (
-            `Last synced: ${new Date(lastSyncedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
-          ) : (
-            "Not synced yet"
-          )}
+        <span className="text-right text-xs text-[var(--muted)]">
+          <span className="block">
+            {lastSyncStatus === "error" ? (
+              <span className="text-[var(--negative)]">Last sync failed{lastError ? `: ${lastError}` : ""}</span>
+            ) : lastSyncedAt ? (
+              `Last synced: ${new Date(lastSyncedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+            ) : (
+              "Not synced yet"
+            )}
+          </span>
+          {finalizedThrough && <span className="block">Data finalized through {formatDate(finalizedThrough)}</span>}
         </span>
       </div>
 

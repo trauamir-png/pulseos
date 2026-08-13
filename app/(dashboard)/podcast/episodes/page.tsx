@@ -35,6 +35,7 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+              <th className="px-4 py-3"></th>
               <th className="px-4 py-3">#</th>
               <th className="px-4 py-3">Title</th>
               <th className="px-4 py-3">Published</th>
@@ -51,13 +52,21 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
           <tbody>
             {episodes.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+                <td colSpan={12} className="px-4 py-10 text-center text-sm text-[var(--muted)]">
                   {params.q ? "No episodes match your search." : "No episodes yet."}
                 </td>
               </tr>
             ) : (
               episodes.map((ep) => (
                 <tr key={ep.id} className="border-b border-[var(--border)] last:border-b-0">
+                  <td className="px-4 py-3">
+                    {ep.artworkUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable podcast host domains; not worth next/image remote-pattern config for a small thumbnail.
+                      <img src={ep.artworkUrl} alt="" className="h-8 w-8 rounded object-cover" />
+                    ) : (
+                      <div className="h-8 w-8 rounded bg-gray-100" />
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-[var(--muted)]">{ep.episodeNumber ?? "–"}</td>
                   <td className="px-4 py-3">
                     <Link href={`/podcast/episodes/${ep.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">

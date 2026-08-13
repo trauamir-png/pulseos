@@ -11,6 +11,11 @@ export interface PodcastRecord {
   artworkUrl: string | null;
   websiteUrl: string | null;
   rssUrl: string | null;
+  language: string | null;
+  author: string | null;
+  rssLastSyncedAt: string | null;
+  rssLastSyncStatus: string | null;
+  rssLastError: string | null;
 }
 
 export interface EpisodeMeta {
@@ -27,13 +32,15 @@ export interface EpisodeMeta {
   spotifyUrl: string | null;
   applePodcastsUrl: string | null;
   youtubeUrl: string | null;
+  seasonNumber: number | null;
+  explicit: boolean | null;
 }
 
 /** A site can have zero, one, or more podcasts -- not hardcoded to a single podcast. */
 export async function getPodcastsForSite(supabase: Supa, siteId: string): Promise<PodcastRecord[]> {
   const { data } = await supabase
     .from("podcasts")
-    .select("id, site_id, name, description, artwork_url, website_url, rss_url")
+    .select("id, site_id, name, description, artwork_url, website_url, rss_url, language, author, rss_last_synced_at, rss_last_sync_status, rss_last_error")
     .eq("site_id", siteId)
     .eq("active", true)
     .order("created_at", { ascending: true });
@@ -46,7 +53,32 @@ export async function getPodcastsForSite(supabase: Supa, siteId: string): Promis
     artworkUrl: p.artwork_url,
     websiteUrl: p.website_url,
     rssUrl: p.rss_url,
+    language: p.language,
+    author: p.author,
+    rssLastSyncedAt: p.rss_last_synced_at,
+    rssLastSyncStatus: p.rss_last_sync_status,
+    rssLastError: p.rss_last_error,
   }));
+}
+
+function toEpisodeMeta(e: Database["public"]["Tables"]["episodes"]["Row"]): EpisodeMeta {
+  return {
+    id: e.id,
+    podcastId: e.podcast_id,
+    title: e.title,
+    episodeNumber: e.episode_number,
+    description: e.description,
+    publishedAt: e.published_at,
+    durationSeconds: e.duration_seconds,
+    artworkUrl: e.artwork_url,
+    pageUrl: e.page_url,
+    audioUrl: e.audio_url,
+    spotifyUrl: e.spotify_url,
+    applePodcastsUrl: e.apple_podcasts_url,
+    youtubeUrl: e.youtube_url,
+    seasonNumber: e.season_number,
+    explicit: e.explicit,
+  };
 }
 
 export async function getEpisodesForSite(supabase: Supa, siteId: string): Promise<EpisodeMeta[]> {
@@ -63,21 +95,7 @@ export async function getEpisodesForSite(supabase: Supa, siteId: string): Promis
     .eq("active", true)
     .order("published_at", { ascending: false });
 
-  return (data ?? []).map((e) => ({
-    id: e.id,
-    podcastId: e.podcast_id,
-    title: e.title,
-    episodeNumber: e.episode_number,
-    description: e.description,
-    publishedAt: e.published_at,
-    durationSeconds: e.duration_seconds,
-    artworkUrl: e.artwork_url,
-    pageUrl: e.page_url,
-    audioUrl: e.audio_url,
-    spotifyUrl: e.spotify_url,
-    applePodcastsUrl: e.apple_podcasts_url,
-    youtubeUrl: e.youtube_url,
-  }));
+  return (data ?? []).map(toEpisodeMeta);
 }
 
 export async function getEpisodeById(supabase: Supa, siteId: string, episodeId: string): Promise<EpisodeMeta | null> {
@@ -87,19 +105,5 @@ export async function getEpisodeById(supabase: Supa, siteId: string, episodeId: 
   const { data: podcast } = await supabase.from("podcasts").select("site_id").eq("id", episode.podcast_id).maybeSingle();
   if (!podcast || podcast.site_id !== siteId) return null;
 
-  return {
-    id: episode.id,
-    podcastId: episode.podcast_id,
-    title: episode.title,
-    episodeNumber: episode.episode_number,
-    description: episode.description,
-    publishedAt: episode.published_at,
-    durationSeconds: episode.duration_seconds,
-    artworkUrl: episode.artwork_url,
-    pageUrl: episode.page_url,
-    audioUrl: episode.audio_url,
-    spotifyUrl: episode.spotify_url,
-    applePodcastsUrl: episode.apple_podcasts_url,
-    youtubeUrl: episode.youtube_url,
-  };
+  return toEpisodeMeta(episode);
 }

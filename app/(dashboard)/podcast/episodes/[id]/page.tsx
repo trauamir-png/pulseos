@@ -60,15 +60,38 @@ export default async function EpisodeDetailPage({
         ← Episodes
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">
-          {episode.episodeNumber != null ? `#${episode.episodeNumber} · ` : ""}
-          {episode.title}
-        </h1>
-        <p className="text-sm text-[var(--muted)]">
-          {episode.publishedAt ? format(new Date(episode.publishedAt), "MMM d, yyyy", { timeZone: range.timezone }) : "Unpublished"} ·{" "}
-          {formatSeconds(episode.durationSeconds)}
-        </p>
+      <div className="flex items-start gap-4">
+        {episode.artworkUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable podcast host domains; not worth next/image remote-pattern config for a single artwork image.
+          <img src={episode.artworkUrl} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
+        ) : null}
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--foreground)]">
+            {episode.episodeNumber != null ? `#${episode.episodeNumber} · ` : ""}
+            {episode.title}
+          </h1>
+          <p className="text-sm text-[var(--muted)]">
+            {episode.publishedAt ? format(new Date(episode.publishedAt), "MMM d, yyyy", { timeZone: range.timezone }) : "Unpublished"} ·{" "}
+            {formatSeconds(episode.durationSeconds)}
+          </p>
+          {episode.description && (
+            // Sanitized server-side at RSS ingestion time (lib/rss/parse.ts) -- safe to render as-is here.
+            <div
+              className="prose prose-sm mt-2 max-w-xl text-[var(--muted)] [&_a]:text-[var(--accent)]"
+              dangerouslySetInnerHTML={{ __html: episode.description }}
+            />
+          )}
+          {episode.audioUrl && (
+            <a
+              href={episode.audioUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-2 inline-block text-xs text-[var(--accent)] hover:underline"
+            >
+              Audio file ↗
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

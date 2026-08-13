@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
-import { getPodcastsForSite } from "@/lib/dashboard/podcast";
+import { getPodcastsForSite, getEpisodesForSite } from "@/lib/dashboard/podcast";
 import {
   getPodcastSummary,
   getPodcastListeningTimeseries,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/dashboard/podcast-queries";
 import { KpiCard } from "@/components/kpi-card";
 import { PodcastListeningChart } from "@/components/podcast-listening-chart";
+import { ConnectPodcastForm, PodcastRssStatusCard } from "@/components/podcast-rss";
 
 function formatSeconds(seconds: number | null): string {
   if (seconds == null) return "–";
@@ -35,14 +36,21 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
           <h1 className="text-2xl font-semibold text-[var(--foreground)]">Podcast Analytics</h1>
           <p className="text-sm text-[var(--muted)]">{site.name}</p>
         </div>
-        <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-24 text-center">
+        <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-24 text-center">
           <p className="text-lg font-medium text-[var(--foreground)]">No podcast configured yet</p>
           <p className="max-w-sm text-sm text-[var(--muted)]">
-            This site doesn&apos;t have a podcast set up. Once a podcast and its episodes exist, listening data will appear here.
+            Connect this site&apos;s podcast via its RSS feed to import its episodes and start seeing listening data here.
           </p>
+          <ConnectPodcastForm siteId={site.id} />
         </div>
       </div>
     );
+  }
+
+  const episodes = await getEpisodesForSite(supabase, site.id);
+  const episodeCountByPodcast = new Map<string, number>();
+  for (const ep of episodes) {
+    episodeCountByPodcast.set(ep.podcastId, (episodeCountByPodcast.get(ep.podcastId) ?? 0) + 1);
   }
 
   const [summary, timeseries, topEpisodes, platforms, sources] = await Promise.all([
@@ -60,6 +68,12 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
       <div>
         <h1 className="text-2xl font-semibold text-[var(--foreground)]">Podcast Analytics</h1>
         <p className="text-sm text-[var(--muted)]">{site.name}</p>
+      </div>
+
+      <div className="space-y-4">
+        {podcasts.map((podcast) => (
+          <PodcastRssStatusCard key={podcast.id} podcast={podcast} episodeCount={episodeCountByPodcast.get(podcast.id) ?? 0} />
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

@@ -171,6 +171,11 @@ export interface Database {
           artwork_url: string | null;
           website_url: string | null;
           rss_url: string | null;
+          language: string | null;
+          author: string | null;
+          rss_last_synced_at: string | null;
+          rss_last_sync_status: string | null;
+          rss_last_error: string | null;
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -183,6 +188,11 @@ export interface Database {
           artwork_url?: string | null;
           website_url?: string | null;
           rss_url?: string | null;
+          language?: string | null;
+          author?: string | null;
+          rss_last_synced_at?: string | null;
+          rss_last_sync_status?: string | null;
+          rss_last_error?: string | null;
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -205,6 +215,9 @@ export interface Database {
           spotify_url: string | null;
           apple_podcasts_url: string | null;
           youtube_url: string | null;
+          rss_guid: string | null;
+          season_number: number | null;
+          explicit: boolean | null;
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -223,6 +236,9 @@ export interface Database {
           spotify_url?: string | null;
           apple_podcasts_url?: string | null;
           youtube_url?: string | null;
+          rss_guid?: string | null;
+          season_number?: number | null;
+          explicit?: boolean | null;
           active?: boolean;
           created_at?: string;
           updated_at?: string;

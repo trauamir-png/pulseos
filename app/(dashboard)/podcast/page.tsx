@@ -138,12 +138,39 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard label="Total Listens" value={summary.totalListens.toLocaleString()} />
-        <KpiCard label="Unique Listeners" value={summary.uniqueListeners.toLocaleString()} />
-        <KpiCard label="Avg Listening Time" value={formatSeconds(summary.avgListeningSeconds)} />
-        <KpiCard label="Completion Rate" value={summary.completionRate.toFixed(1)} suffix="%" />
-        <KpiCard label="Listening Now" value={summary.listeningNow.toLocaleString()} />
+      <div className="space-y-4">
+        {podbeanSections.map((s) => (
+          <PodbeanSection
+            key={s.podcastId}
+            podcastName={s.podcastName}
+            hasMappedEpisodes={s.hasMappedEpisodes}
+            lastSyncedAt={s.lastSyncedAt}
+            lastSyncStatus={s.lastSyncStatus}
+            lastError={s.lastError}
+            downloadsSummary={s.downloadsSummary}
+            downloadsTimeseries={s.downloadsTimeseries}
+            monthlyDownloadsHistory={s.monthlyDownloadsHistory}
+            topEpisodes={s.topEpisodes}
+            engagement={s.engagement}
+            countriesRange={s.countriesRange}
+            platformsRange={s.platformsRange}
+            sourcesRange={s.sourcesRange}
+            countriesAllTime={s.countriesAllTime}
+            platformsAllTime={s.platformsAllTime}
+            sourcesAllTime={s.sourcesAllTime}
+          />
+        ))}
+      </div>
+
+      <div>
+        <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Website Listening (PulseOS Web Player)</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <KpiCard label="Total Listens" value={summary.totalListens.toLocaleString()} />
+          <KpiCard label="Unique Listeners" value={summary.uniqueListeners.toLocaleString()} />
+          <KpiCard label="Avg Listening Time" value={formatSeconds(summary.avgListeningSeconds)} />
+          <KpiCard label="Completion Rate" value={summary.completionRate.toFixed(1)} suffix="%" />
+          <KpiCard label="Listening Now" value={summary.listeningNow.toLocaleString()} />
+        </div>
       </div>
 
       {noData ? (
@@ -253,30 +280,6 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
           </div>
         </>
       )}
-
-      <div className="space-y-4">
-        {podbeanSections.map((s) => (
-          <PodbeanSection
-            key={s.podcastId}
-            podcastName={s.podcastName}
-            hasMappedEpisodes={s.hasMappedEpisodes}
-            lastSyncedAt={s.lastSyncedAt}
-            lastSyncStatus={s.lastSyncStatus}
-            lastError={s.lastError}
-            downloadsSummary={s.downloadsSummary}
-            downloadsTimeseries={s.downloadsTimeseries}
-            monthlyDownloadsHistory={s.monthlyDownloadsHistory}
-            topEpisodes={s.topEpisodes}
-            engagement={s.engagement}
-            countriesRange={s.countriesRange}
-            platformsRange={s.platformsRange}
-            sourcesRange={s.sourcesRange}
-            countriesAllTime={s.countriesAllTime}
-            platformsAllTime={s.platformsAllTime}
-            sourcesAllTime={s.sourcesAllTime}
-          />
-        ))}
-      </div>
     </div>
   );
 }

@@ -3,7 +3,8 @@ import { format } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
 import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
-import { getEpisodesList } from "@/lib/dashboard/podcast-queries";
+import { getEpisodesForSite } from "@/lib/dashboard/podcast";
+import { getPodbeanEpisodesMetrics } from "@/lib/dashboard/podbean-queries";
 import { EpisodesSearch } from "@/components/episodes-search";
 
 function formatSeconds(seconds: number | null): string {
@@ -13,13 +14,23 @@ function formatSeconds(seconds: number | null): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function formatPercent(rate: number | null): string {
+  if (rate == null) return "–";
+  const pct = rate <= 1 ? rate * 100 : rate;
+  return `${pct.toFixed(1)}%`;
+}
+
 export default async function PodcastEpisodesPage({ searchParams }: { searchParams: Promise<DashboardSearchParams & { q?: string }> }) {
   const params = await searchParams;
   const { site, range } = await resolveDashboardContext(params);
   requireModule(site, "podcast_analytics");
 
   const supabase = await createClient();
-  const episodes = await getEpisodesList(supabase, site.id, range.from, range.to, params.q);
+  const allEpisodes = await getEpisodesForSite(supabase, site.id);
+  const episodes = params.q ? allEpisodes.filter((ep) => ep.title.toLowerCase().includes(params.q!.toLowerCase())) : allEpisodes;
+
+  const podcastIds = Array.from(new Set(allEpisodes.map((ep) => ep.podcastId)));
+  const podbeanMetrics = await getPodbeanEpisodesMetrics(supabase, podcastIds);
 
   return (
     <div className="space-y-6">
@@ -31,6 +42,14 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
         <EpisodesSearch />
       </div>
 
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center rounded-full bg-orange-600 px-2.5 py-0.5 text-xs font-semibold text-white">Podbean</span>
+        <p className="text-xs text-[var(--muted)]">
+          Downloads and listener metrics below come from Podbean&apos;s hosting analytics. PulseOS Web Player metrics (plays, completion, outbound
+          clicks) are shown on each episode&apos;s detail page.
+        </p>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
         <table className="w-full text-sm">
           <thead>
@@ -40,52 +59,53 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
               <th className="px-4 py-3">Title</th>
               <th className="px-4 py-3">Published</th>
               <th className="px-4 py-3">Duration</th>
-              <th className="px-4 py-3">Listens</th>
-              <th className="px-4 py-3">Unique listeners</th>
-              <th className="px-4 py-3">Avg listening time</th>
-              <th className="px-4 py-3">Completion</th>
-              <th className="px-4 py-3">Spotify clicks</th>
-              <th className="px-4 py-3">Apple clicks</th>
-              <th className="px-4 py-3">YouTube clicks</th>
+              <th className="px-4 py-3">Podbean Downloads</th>
+              <th className="px-4 py-3">Podbean Listeners</th>
+              <th className="px-4 py-3">Engaged Listeners</th>
+              <th className="px-4 py-3">Avg Consumption</th>
+              <th className="px-4 py-3">Avg Consumption Time</th>
             </tr>
           </thead>
           <tbody>
             {episodes.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+                <td colSpan={10} className="px-4 py-10 text-center text-sm text-[var(--muted)]">
                   {params.q ? "No episodes match your search." : "No episodes yet."}
                 </td>
               </tr>
             ) : (
-              episodes.map((ep) => (
-                <tr key={ep.id} className="border-b border-[var(--border)] last:border-b-0">
-                  <td className="px-4 py-3">
-                    {ep.artworkUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable podcast host domains; not worth next/image remote-pattern config for a small thumbnail.
-                      <img src={ep.artworkUrl} alt="" className="h-8 w-8 rounded object-cover" />
-                    ) : (
-                      <div className="h-8 w-8 rounded bg-gray-100" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{ep.episodeNumber ?? "–"}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/podcast/episodes/${ep.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
-                      {ep.title}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">
-                    {ep.publishedAt ? format(new Date(ep.publishedAt), "MMM d, yyyy", { timeZone: range.timezone }) : "–"}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{formatSeconds(ep.durationSeconds)}</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{ep.listens.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{ep.uniqueListeners.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{formatSeconds(ep.avgListeningSeconds)}</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{ep.completionRate.toFixed(1)}%</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{ep.spotifyClicks.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{ep.appleClicks.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-[var(--foreground)]">{ep.youtubeClicks.toLocaleString()}</td>
-                </tr>
-              ))
+              episodes.map((ep) => {
+                const pb = podbeanMetrics.get(ep.id);
+                return (
+                  <tr key={ep.id} className="border-b border-[var(--border)] last:border-b-0">
+                    <td className="px-4 py-3">
+                      {ep.artworkUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable podcast host domains; not worth next/image remote-pattern config for a small thumbnail.
+                        <img src={ep.artworkUrl} alt="" className="h-8 w-8 rounded object-cover" />
+                      ) : (
+                        <div className="h-8 w-8 rounded bg-gray-100" />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{ep.episodeNumber ?? "–"}</td>
+                    <td className="px-4 py-3">
+                      <Link href={`/podcast/episodes/${ep.id}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
+                        {ep.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">
+                      {ep.publishedAt ? format(new Date(ep.publishedAt), "MMM d, yyyy", { timeZone: range.timezone }) : "–"}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{formatSeconds(ep.durationSeconds)}</td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{pb ? pb.downloadsAllTime.toLocaleString() : "–"}</td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{pb?.listeners != null ? pb.listeners.toLocaleString() : "–"}</td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">
+                      {pb?.engagedListeners != null ? pb.engagedListeners.toLocaleString() : "–"}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{formatPercent(pb?.avgConsumptionRate ?? null)}</td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{formatSeconds(pb?.avgConsumptionTimeSeconds ?? null)}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

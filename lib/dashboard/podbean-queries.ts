@@ -159,6 +159,92 @@ function aggregateByKey(rows: Array<{ dimension_key: string; downloads: number }
     .sort((a, b) => b.downloads - a.downloads);
 }
 
+export interface PodbeanEpisodeMetrics {
+  episodeId: string;
+  downloadsAllTime: number;
+  listeners: number | null;
+  engagedListeners: number | null;
+  avgConsumptionRate: number | null;
+  avgConsumptionTimeSeconds: number | null;
+  engagementStatDate: string | null;
+}
+
+/** Paginates past PostgREST's default 1000-row cap -- these tables are large enough (tens of thousands of rows for a single podcast) that an unpaginated .select() would silently undercount. */
+async function fetchAllRows<Row>(queryPage: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
+  const pageSize = 1000;
+  let all: Row[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await queryPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    all = all.concat(rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+/**
+ * Per-episode downloads (daily + monthly, same non-overlapping additive
+ * pattern as getPodbeanDownloadsSummary's all-time figure) plus each
+ * episode's latest engagement snapshot. Keyed by podcast IDs rather than
+ * episode IDs so callers with hundreds of episodes don't risk an oversized
+ * .in() filter -- pass every podcast ID for the site being rendered.
+ */
+export async function getPodbeanEpisodesMetrics(supabase: Supa, podcastIds: string[]): Promise<Map<string, PodbeanEpisodeMetrics>> {
+  if (podcastIds.length === 0) return new Map();
+
+  const [dailyRows, monthlyRows, engagementRows] = await Promise.all([
+    fetchAllRows<{ episode_id: string; downloads: number }>((from, to) =>
+      supabase.from("podbean_episode_daily_downloads").select("episode_id, downloads").in("podcast_id", podcastIds).range(from, to),
+    ),
+    fetchAllRows<{ episode_id: string; downloads: number }>((from, to) =>
+      supabase.from("podbean_episode_monthly_downloads").select("episode_id, downloads").in("podcast_id", podcastIds).range(from, to),
+    ),
+    fetchAllRows<{
+      episode_id: string;
+      stat_date: string;
+      listeners: number;
+      engaged_listeners: number;
+      average_consumption_rate: number | null;
+      average_consumption_time_seconds: number | null;
+    }>((from, to) =>
+      supabase
+        .from("podbean_episode_engagement_daily")
+        .select("episode_id, stat_date, listeners, engaged_listeners, average_consumption_rate, average_consumption_time_seconds")
+        .in("podcast_id", podcastIds)
+        .order("stat_date", { ascending: false })
+        .range(from, to),
+    ),
+  ]);
+
+  const downloads = new Map<string, number>();
+  for (const r of dailyRows) downloads.set(r.episode_id, (downloads.get(r.episode_id) ?? 0) + r.downloads);
+  for (const r of monthlyRows) downloads.set(r.episode_id, (downloads.get(r.episode_id) ?? 0) + r.downloads);
+
+  const latestEngagement = new Map<string, (typeof engagementRows)[number]>();
+  for (const r of engagementRows) {
+    if (!latestEngagement.has(r.episode_id)) latestEngagement.set(r.episode_id, r);
+  }
+
+  const episodeIds = new Set<string>([...downloads.keys(), ...latestEngagement.keys()]);
+  const result = new Map<string, PodbeanEpisodeMetrics>();
+  for (const episodeId of episodeIds) {
+    const eng = latestEngagement.get(episodeId);
+    result.set(episodeId, {
+      episodeId,
+      downloadsAllTime: downloads.get(episodeId) ?? 0,
+      listeners: eng?.listeners ?? null,
+      engagedListeners: eng?.engaged_listeners ?? null,
+      avgConsumptionRate: eng?.average_consumption_rate ?? null,
+      avgConsumptionTimeSeconds: eng?.average_consumption_time_seconds ?? null,
+      engagementStatDate: eng?.stat_date ?? null,
+    });
+  }
+  return result;
+}
+
 export interface PodbeanEngagementSummary {
   listeners: number;
   engagedListeners: number;

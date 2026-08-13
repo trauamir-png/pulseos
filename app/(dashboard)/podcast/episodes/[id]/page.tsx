@@ -5,6 +5,7 @@ import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashb
 import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodeById } from "@/lib/dashboard/podcast";
 import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
+import { getPodbeanEpisodesMetrics } from "@/lib/dashboard/podbean-queries";
 import { KpiCard } from "@/components/kpi-card";
 
 function formatSeconds(seconds: number | null): string {
@@ -12,6 +13,21 @@ function formatSeconds(seconds: number | null): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function formatPercent(rate: number | null): string {
+  if (rate == null) return "–";
+  const pct = rate <= 1 ? rate * 100 : rate;
+  return `${pct.toFixed(1)}%`;
+}
+
+function KpiCardSmall({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-orange-200 bg-white p-4">
+      <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
+      <p className="mt-1 text-xl font-semibold tracking-tight text-[var(--foreground)]">{value}</p>
+    </div>
+  );
 }
 
 const FUNNEL_STEPS = [
@@ -53,6 +69,7 @@ export default async function EpisodeDetailPage({
 
   const detail = await getEpisodeDetail(supabase, site.id, episode.id, range.from, range.to);
   const noData = detail.overview.listens === 0;
+  const podbeanMetrics = (await getPodbeanEpisodesMetrics(supabase, [episode.podcastId])).get(episode.id) ?? null;
 
   return (
     <div className="space-y-6">
@@ -94,17 +111,51 @@ export default async function EpisodeDetailPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <KpiCard label="Listens" value={detail.overview.listens.toLocaleString()} />
-        <KpiCard label="Unique Listeners" value={detail.overview.uniqueListeners.toLocaleString()} />
-        <KpiCard label="Avg Listening Time" value={formatSeconds(detail.overview.avgListeningSeconds)} />
-        <KpiCard label="Completion Rate" value={detail.overview.completionRate.toFixed(1)} suffix="%" />
+      <div className="space-y-4 rounded-xl border border-orange-200 bg-orange-50/40 p-5">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full bg-orange-600 px-2.5 py-0.5 text-xs font-semibold text-white">Podbean</span>
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Podbean Analytics</h2>
+        </div>
+        {podbeanMetrics ? (
+          <>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <KpiCardSmall label="Downloads (all-time)" value={podbeanMetrics.downloadsAllTime.toLocaleString()} />
+              <KpiCardSmall label="Listeners" value={podbeanMetrics.listeners != null ? podbeanMetrics.listeners.toLocaleString() : "–"} />
+              <KpiCardSmall
+                label="Engaged listeners"
+                value={podbeanMetrics.engagedListeners != null ? podbeanMetrics.engagedListeners.toLocaleString() : "–"}
+              />
+              <KpiCardSmall label="Avg consumption rate" value={formatPercent(podbeanMetrics.avgConsumptionRate)} />
+            </div>
+            <p className="text-xs text-[var(--muted)]">
+              Avg consumption time: {formatSeconds(podbeanMetrics.avgConsumptionTimeSeconds)}
+              {podbeanMetrics.engagementStatDate
+                ? ` · listener/engagement figures as of ${new Date(`${podbeanMetrics.engagementStatDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                : ""}
+            </p>
+          </>
+        ) : (
+          <p className="py-2 text-center text-sm text-[var(--muted)]">Not mapped to Podbean, or no Podbean data synced for this episode yet.</p>
+        )}
+      </div>
+
+      <div>
+        <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">PulseOS Web Player</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <KpiCard label="Plays" value={detail.overview.listens.toLocaleString()} />
+          <KpiCard label="Unique Listeners" value={detail.overview.uniqueListeners.toLocaleString()} />
+          <KpiCard label="Avg Listening Time" value={formatSeconds(detail.overview.avgListeningSeconds)} />
+          <KpiCard label="Completion Rate" value={detail.overview.completionRate.toFixed(1)} suffix="%" />
+        </div>
       </div>
 
       {noData ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 text-center">
-          <p className="text-lg font-medium text-[var(--foreground)]">No listening data yet</p>
-          <p className="max-w-sm text-sm text-[var(--muted)]">Once listeners play this episode, its funnel, sources, and platform activity will show up here.</p>
+          <p className="text-lg font-medium text-[var(--foreground)]">No Web Player listening data yet</p>
+          <p className="max-w-sm text-sm text-[var(--muted)]">
+            PulseOS&apos;s own audio player and listening-progress tracking aren&apos;t built yet, so this funnel, sources, and platform activity
+            stay empty for now. Podbean&apos;s hosting analytics above are unaffected.
+          </p>
         </div>
       ) : (
         <>

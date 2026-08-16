@@ -5,6 +5,39 @@ import type { Database } from "@/lib/supabase/types";
 type Supa = SupabaseClient<Database>;
 type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
 
+const EXCERPT_MAX_LENGTH = 200;
+const WORDS_PER_MINUTE = 200;
+
+/** Strips tags/entities from the sanitized body HTML down to plain text, for excerpt/reading-time derivation only -- never used to mutate the stored body. */
+function stripHtmlToText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function makeExcerpt(bodyHtml: string, maxLength = EXCERPT_MAX_LENGTH): string {
+  const plain = stripHtmlToText(bodyHtml);
+  if (plain.length <= maxLength) return plain;
+  const truncated = plain.slice(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(" ");
+  const clean = lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated;
+  return `${clean.trimEnd()}…`;
+}
+
+function calculateReadingTimeMinutes(bodyHtml: string): number {
+  const plain = stripHtmlToText(bodyHtml);
+  if (!plain) return 0;
+  const wordCount = plain.split(" ").filter(Boolean).length;
+  return Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE));
+}
+
 /**
  * Resolves site_key -> site_id for the public Content API. Uses the
  * service-role client because `sites` has no anon SELECT policy (it
@@ -41,6 +74,8 @@ export interface PublicColumn {
   subtitle: string | null;
   slug: string;
   body: string;
+  excerpt: string;
+  readingTimeMinutes: number;
   featuredImageUrl: string | null;
   author: PublicAuthor | null;
   category: PublicCategory | null;
@@ -89,6 +124,8 @@ export async function serializePublicColumns(supabase: Supa, rows: ColumnRow[]):
       subtitle: row.subtitle,
       slug: row.slug,
       body: row.body,
+      excerpt: makeExcerpt(row.body),
+      readingTimeMinutes: calculateReadingTimeMinutes(row.body),
       featuredImageUrl: row.featured_image_id ? (imageUrls.get(row.featured_image_id) ?? null) : null,
       author: author
         ? {

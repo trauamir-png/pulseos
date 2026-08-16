@@ -1,3 +1,25 @@
+/**
+ * The only hosting_provider values PulseOS knows about. Keep in sync with
+ * migration 0011's CHECK constraint -- this list and the DB constraint must
+ * always agree, or a value the UI can produce could be rejected at write
+ * time (or worse, the DB could accept a value the UI never offers).
+ */
+export const HOSTING_PROVIDER_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "spotify_for_podcasters", label: "Spotify for Creators" },
+  { value: "podbean", label: "Podbean" },
+  { value: "buzzsprout", label: "Buzzsprout" },
+  { value: "libsyn", label: "Libsyn" },
+  { value: "captivate", label: "Captivate" },
+  { value: "transistor", label: "Transistor" },
+  { value: "simplecast", label: "Simplecast" },
+  { value: "other", label: "Other" },
+];
+
+export function hostingProviderLabel(value: string | null): string {
+  if (!value) return "Not set";
+  return HOSTING_PROVIDER_OPTIONS.find((o) => o.value === value)?.label ?? "Other";
+}
+
 const HOST_PATTERNS: Array<{ provider: string; test: (host: string) => boolean }> = [
   { provider: "podbean", test: (h) => h.includes("podbean.com") },
   { provider: "spotify_for_podcasters", test: (h) => h.includes("anchor.fm") || h.includes("spotifycreators") || h.includes("spotifyforpodcasters") },

@@ -4,8 +4,15 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAndParseFeed, RssParseError, type ParsedEpisode } from "@/lib/rss/parse";
-import { detectHostingProvider } from "@/lib/rss/hosting-provider";
+import { detectHostingProvider, HOSTING_PROVIDER_OPTIONS } from "@/lib/rss/hosting-provider";
 import type { Database } from "@/lib/supabase/types";
+
+const VALID_PROVIDERS = new Set(HOSTING_PROVIDER_OPTIONS.map((o) => o.value));
+
+function normalizeHostingProvider(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return VALID_PROVIDERS.has(value) ? value : "other";
+}
 
 type EpisodeInsert = Database["public"]["Tables"]["episodes"]["Insert"];
 type EpisodeRow = Database["public"]["Tables"]["episodes"]["Row"];
@@ -103,7 +110,13 @@ export async function applyFeedEpisodes(
   return { added: toInsert.length, updated: toUpdate.length, unchanged };
 }
 
-export async function connectPodcast(siteId: string, rssUrl: string) {
+/**
+ * `hostingProvider` is the user's confirmed choice from the connect form
+ * (pre-filled from detectHostingProvider() as a suggestion, but always an
+ * explicit value by the time it reaches here -- auto-detection is only ever
+ * a default, never silently substituted for what the user picked).
+ */
+export async function connectPodcast(siteId: string, rssUrl: string, hostingProvider: string | null) {
   const trimmedUrl = rssUrl.trim();
   if (!trimmedUrl) throw new Error("RSS URL is required.");
 
@@ -127,7 +140,7 @@ export async function connectPodcast(siteId: string, rssUrl: string) {
       language: feed.podcast.language,
       author: feed.podcast.author,
       rss_url: trimmedUrl,
-      hosting_provider: detectHostingProvider(trimmedUrl),
+      hosting_provider: normalizeHostingProvider(hostingProvider ?? detectHostingProvider(trimmedUrl)),
       rss_last_synced_at: new Date().toISOString(),
       rss_last_sync_status: "success",
       rss_last_error: null,
@@ -146,10 +159,16 @@ export async function connectPodcast(siteId: string, rssUrl: string) {
 
 /**
  * Fetches a podcast's saved RSS feed, upserts its episodes by GUID, and
- * refreshes the podcast's own metadata + sync status columns. Provider-
- * agnostic and client-agnostic (works with the cookie-bound dashboard client
- * or the service-role admin client), so both the "Sync now" server action
- * below and any future cron job can share this one code path.
+ * refreshes the podcast's own feed-derived metadata + sync status columns.
+ * Provider-agnostic and client-agnostic (works with the cookie-bound
+ * dashboard client or the service-role admin client), so both the "Sync now"
+ * server action below and any future cron job can share this one code path.
+ *
+ * Deliberately never touches hosting_provider -- that's a one-time
+ * auto-detected suggestion at connect time, then a user-owned setting from
+ * then on (see updatePodcastSettings). A routine RSS refresh (manual or
+ * cron) must not silently revert a provider the user explicitly chose or
+ * corrected.
  */
 export async function syncPodcastFeed(
   supabase: SupabaseClient<Database>,
@@ -178,7 +197,6 @@ export async function syncPodcastFeed(
       description: feed.podcast.description,
       artwork_url: feed.podcast.artworkUrl,
       website_url: feed.podcast.websiteUrl,
-      hosting_provider: detectHostingProvider(podcast.rss_url),
       language: feed.podcast.language,
       author: feed.podcast.author,
       rss_last_synced_at: new Date().toISOString(),
@@ -189,6 +207,60 @@ export async function syncPodcastFeed(
   if (updateError) throw new Error(updateError.message);
 
   return summary;
+}
+
+/**
+ * Edits an existing podcast's RSS URL and/or hosting provider. Never touches
+ * episodes or RSS sync history -- switching provider (e.g. Podbean ->
+ * Spotify for Creators) only changes which hosting-analytics UI/sync paths
+ * apply going forward. If the new provider isn't Podbean, the podcast's
+ * Podbean identity/sync-status fields are cleared so no stale Podbean state
+ * (or a stale UI badge racing the update) can linger; their own analytics
+ * tables (podbean_podcast_daily_downloads etc.) are left alone since they're
+ * keyed by podcast_id and simply stop being queried once hosting_provider
+ * no longer matches "podbean".
+ */
+export async function updatePodcastSettings(
+  podcastId: string,
+  updates: { rssUrl?: string; hostingProvider?: string | null },
+) {
+  const supabase = await createClient();
+
+  const nextProvider = updates.hostingProvider !== undefined ? normalizeHostingProvider(updates.hostingProvider) : undefined;
+  const nextRssUrl = updates.rssUrl?.trim();
+
+  const patch: Database["public"]["Tables"]["podcasts"]["Update"] = {};
+  if (nextRssUrl !== undefined) {
+    if (!nextRssUrl) throw new Error("RSS URL is required.");
+    patch.rss_url = nextRssUrl;
+  }
+  if (nextProvider !== undefined) {
+    patch.hosting_provider = nextProvider;
+    if (nextProvider !== "podbean") {
+      patch.podbean_podcast_id = null;
+      patch.podbean_last_synced_at = null;
+      patch.podbean_last_sync_status = null;
+      patch.podbean_last_error = null;
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from("podcasts").update(patch).eq("id", podcastId);
+    if (error) throw new Error(error.message);
+  }
+
+  let summary: { added: number; updated: number; unchanged: number } | null = null;
+  if (nextRssUrl !== undefined) {
+    const { data: podcast, error: fetchError } = await supabase.from("podcasts").select("id, rss_url").eq("id", podcastId).single();
+    if (fetchError) throw new Error(fetchError.message);
+    summary = await syncPodcastFeed(supabase, podcast);
+  }
+
+  revalidatePath("/podcast");
+  revalidatePath("/podcast/episodes");
+  revalidatePath(`/podcast/episodes/${podcastId}`);
+
+  return { summary };
 }
 
 export async function syncPodcastRss(podcastId: string) {

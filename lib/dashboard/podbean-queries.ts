@@ -170,19 +170,40 @@ export interface PodbeanEpisodeMetrics {
 }
 
 /** Paginates past PostgREST's default 1000-row cap -- these tables are large enough (tens of thousands of rows for a single podcast) that an unpaginated .select() would silently undercount. */
-async function fetchAllRows<Row>(queryPage: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
+/**
+ * Pages through a query past PostgREST's 1000-row cap. The first page also
+ * requests an exact count (callers must pass `{ count: "exact" }` in their
+ * `.select()`), so once the total is known every remaining page is fetched
+ * in parallel instead of one sequential round trip per page -- for a table
+ * with tens of thousands of rows for a single podcast, that's the difference
+ * between ~25 sequential round trips and ~2. Same rows, same order, same
+ * filter -- only the transport strategy changes.
+ */
+async function fetchAllRows<Row>(
+  queryPage: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>,
+): Promise<Row[]> {
   const pageSize = 1000;
-  let all: Row[] = [];
-  let from = 0;
-  for (;;) {
-    const { data, error } = await queryPage(from, from + pageSize - 1);
-    if (error) throw error;
-    const rows = data ?? [];
-    all = all.concat(rows);
-    if (rows.length < pageSize) break;
-    from += pageSize;
+  const first = await queryPage(0, pageSize - 1);
+  if (first.error) throw first.error;
+  const firstRows = first.data ?? [];
+  const total = first.count ?? firstRows.length;
+
+  if (firstRows.length < pageSize || total <= pageSize) return firstRows;
+
+  const remainingPages = Math.ceil((total - pageSize) / pageSize);
+  const rest = await Promise.all(
+    Array.from({ length: remainingPages }, (_, i) => {
+      const from = pageSize * (i + 1);
+      return queryPage(from, from + pageSize - 1);
+    }),
+  );
+
+  const rows = firstRows.slice();
+  for (const page of rest) {
+    if (page.error) throw page.error;
+    rows.push(...(page.data ?? []));
   }
-  return all;
+  return rows;
 }
 
 /**
@@ -197,10 +218,10 @@ export async function getPodbeanEpisodesMetrics(supabase: Supa, podcastIds: stri
 
   const [dailyRows, monthlyRows, engagementRows] = await Promise.all([
     fetchAllRows<{ episode_id: string; downloads: number }>((from, to) =>
-      supabase.from("podbean_episode_daily_downloads").select("episode_id, downloads").in("podcast_id", podcastIds).range(from, to),
+      supabase.from("podbean_episode_daily_downloads").select("episode_id, downloads", { count: "exact" }).in("podcast_id", podcastIds).range(from, to),
     ),
     fetchAllRows<{ episode_id: string; downloads: number }>((from, to) =>
-      supabase.from("podbean_episode_monthly_downloads").select("episode_id, downloads").in("podcast_id", podcastIds).range(from, to),
+      supabase.from("podbean_episode_monthly_downloads").select("episode_id, downloads", { count: "exact" }).in("podcast_id", podcastIds).range(from, to),
     ),
     fetchAllRows<{
       episode_id: string;
@@ -212,7 +233,7 @@ export async function getPodbeanEpisodesMetrics(supabase: Supa, podcastIds: stri
     }>((from, to) =>
       supabase
         .from("podbean_episode_engagement_daily")
-        .select("episode_id, stat_date, listeners, engaged_listeners, average_consumption_rate, average_consumption_time_seconds")
+        .select("episode_id, stat_date, listeners, engaged_listeners, average_consumption_rate, average_consumption_time_seconds", { count: "exact" })
         .in("podcast_id", podcastIds)
         .order("stat_date", { ascending: false })
         .range(from, to),

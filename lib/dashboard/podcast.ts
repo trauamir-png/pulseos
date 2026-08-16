@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
@@ -41,8 +42,15 @@ export interface EpisodeMeta {
   explicit: boolean | null;
 }
 
-/** A site can have zero, one, or more podcasts -- not hardcoded to a single podcast. */
-export async function getPodcastsForSite(supabase: Supa, siteId: string): Promise<PodcastRecord[]> {
+/**
+ * A site can have zero, one, or more podcasts -- not hardcoded to a single
+ * podcast. Wrapped in React's cache() because a single page render can call
+ * this (directly, and indirectly via getEpisodesForSite/durationMap in
+ * podcast-queries.ts) several times over with the same (supabase, siteId)
+ * pair -- e.g. the Podcast Overview page's Promise.all of summary/timeseries
+ * /topEpisodes/platforms/sources each trigger it independently.
+ */
+export const getPodcastsForSite = cache(async (supabase: Supa, siteId: string): Promise<PodcastRecord[]> => {
   const { data } = await supabase
     .from("podcasts")
     .select(
@@ -71,7 +79,7 @@ export async function getPodcastsForSite(supabase: Supa, siteId: string): Promis
     podbeanLastSyncStatus: p.podbean_last_sync_status,
     podbeanLastError: p.podbean_last_error,
   }));
-}
+});
 
 function toEpisodeMeta(e: Database["public"]["Tables"]["episodes"]["Row"]): EpisodeMeta {
   return {
@@ -93,7 +101,15 @@ function toEpisodeMeta(e: Database["public"]["Tables"]["episodes"]["Row"]): Epis
   };
 }
 
-export async function getEpisodesForSite(supabase: Supa, siteId: string): Promise<EpisodeMeta[]> {
+/**
+ * Wrapped in React's cache() for the same reason as getPodcastsForSite --
+ * podcast-queries.ts's durationMap() calls this from five different
+ * functions (getPodcastSummary, getPodcastListeningTimeseries, getTopEpisodes,
+ * getPlatformsBreakdown, getPodcastSourcesBreakdown, getEpisodeDetail), all of
+ * which run inside the same page's Promise.all with the same (supabase,
+ * siteId) pair.
+ */
+export const getEpisodesForSite = cache(async (supabase: Supa, siteId: string): Promise<EpisodeMeta[]> => {
   const podcasts = await getPodcastsForSite(supabase, siteId);
   if (podcasts.length === 0) return [];
 
@@ -108,7 +124,7 @@ export async function getEpisodesForSite(supabase: Supa, siteId: string): Promis
     .order("published_at", { ascending: false });
 
   return (data ?? []).map(toEpisodeMeta);
-}
+});
 
 export async function getEpisodeById(supabase: Supa, siteId: string, episodeId: string): Promise<EpisodeMeta | null> {
   const { data: episode } = await supabase.from("episodes").select("*").eq("id", episodeId).maybeSingle();

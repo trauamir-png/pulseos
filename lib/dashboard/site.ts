@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 export interface SiteRecord {
@@ -13,7 +14,12 @@ export interface SiteRecord {
   modules: string[];
 }
 
-export async function listSites(): Promise<SiteRecord[]> {
+/**
+ * Wrapped in React's cache() so the layout's call and every page's
+ * resolveDashboardContext() -> getSelectedSite() call share one query per
+ * request instead of hitting Supabase twice on every navigation.
+ */
+export const listSites = cache(async (): Promise<SiteRecord[]> => {
   const supabase = await createClient();
   const [{ data: sites }, { data: modules }] = await Promise.all([
     supabase.from("sites").select("*").order("created_at", { ascending: true }),
@@ -28,7 +34,7 @@ export async function listSites(): Promise<SiteRecord[]> {
   }
 
   return (sites ?? []).map((site) => ({ ...site, modules: modulesBySite.get(site.id) ?? [] }));
-}
+});
 
 /** Resolves the site to show: the one requested via ?site=, or the first active site. */
 export async function getSelectedSite(requestedId?: string): Promise<{ site: SiteRecord | null; sites: SiteRecord[] }> {

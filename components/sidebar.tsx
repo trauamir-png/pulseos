@@ -47,6 +47,25 @@ const GLOBAL_ITEMS = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+const ALL_NAV_ITEMS = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...GLOBAL_ITEMS];
+
+/**
+ * Nested routes (e.g. /podcast/episodes/[id]) must keep their section's own
+ * item active, but a parent item (/podcast) must not also light up just
+ * because its href is a string-prefix of a sibling's href
+ * (/podcast/episodes). So instead of testing each item against the
+ * pathname independently, find the single longest href that matches --
+ * that's the only one that's active.
+ */
+function matchesRoute(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function activeHrefFor(pathname: string) {
+  const matches = ALL_NAV_ITEMS.filter((item) => matchesRoute(pathname, item.href));
+  return matches.sort((a, b) => b.href.length - a.href.length)[0]?.href;
+}
+
 export function Sidebar({ sites }: { sites: SiteRecord[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -59,8 +78,10 @@ export function Sidebar({ sites }: { sites: SiteRecord[] }) {
   const showPodcastAnalytics = hasModule(site, "podcast_analytics");
   const showContent = hasModule(site, "content_management");
 
+  const activeHref = activeHrefFor(pathname);
+
   function renderLink(href: string, label: string, Icon: typeof LayoutDashboard) {
-    const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+    const active = href === activeHref;
     return (
       <Link
         key={href}

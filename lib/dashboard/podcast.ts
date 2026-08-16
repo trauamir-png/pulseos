@@ -11,6 +11,7 @@ export interface PodcastRecord {
   artworkUrl: string | null;
   websiteUrl: string | null;
   rssUrl: string | null;
+  hostingProvider: string | null;
   language: string | null;
   author: string | null;
   rssLastSyncedAt: string | null;
@@ -45,7 +46,7 @@ export async function getPodcastsForSite(supabase: Supa, siteId: string): Promis
   const { data } = await supabase
     .from("podcasts")
     .select(
-      "id, site_id, name, description, artwork_url, website_url, rss_url, language, author, rss_last_synced_at, rss_last_sync_status, rss_last_error, podbean_podcast_id, podbean_last_synced_at, podbean_last_sync_status, podbean_last_error",
+      "id, site_id, name, description, artwork_url, website_url, rss_url, hosting_provider, language, author, rss_last_synced_at, rss_last_sync_status, rss_last_error, podbean_podcast_id, podbean_last_synced_at, podbean_last_sync_status, podbean_last_error",
     )
     .eq("site_id", siteId)
     .eq("active", true)
@@ -59,6 +60,7 @@ export async function getPodcastsForSite(supabase: Supa, siteId: string): Promis
     artworkUrl: p.artwork_url,
     websiteUrl: p.website_url,
     rssUrl: p.rss_url,
+    hostingProvider: p.hosting_provider,
     language: p.language,
     author: p.author,
     rssLastSyncedAt: p.rss_last_synced_at,

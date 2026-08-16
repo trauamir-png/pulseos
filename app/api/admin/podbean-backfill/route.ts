@@ -46,10 +46,15 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: podcast, error } = await admin.from("podcasts").select("id").eq("id", body.podcastId).maybeSingle();
+  const { data: podcast, error } = await admin.from("podcasts").select("id, hosting_provider").eq("id", body.podcastId).maybeSingle();
 
   if (error || !podcast) {
     return NextResponse.json({ error: "podcast_not_found" }, { status: 404 });
+  }
+  // Same account-scoped-API risk as /api/cron/podbean-sync: refuse to run
+  // Podbean identity resolution against a podcast that isn't Podbean-hosted.
+  if (podcast.hosting_provider !== "podbean") {
+    return NextResponse.json({ error: "not_podbean_hosted" }, { status: 400 });
   }
 
   try {

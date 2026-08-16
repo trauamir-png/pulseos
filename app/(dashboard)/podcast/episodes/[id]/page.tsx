@@ -3,7 +3,7 @@ import { format } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
 import { resolveDashboardContext, dashboardQueryString, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { requireModule } from "@/lib/dashboard/modules";
-import { getEpisodeById } from "@/lib/dashboard/podcast";
+import { getEpisodeById, getPodcastsForSite } from "@/lib/dashboard/podcast";
 import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
 import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisode } from "@/lib/dashboard/podbean-queries";
 import { KpiCard } from "@/components/kpi-card";
@@ -70,9 +70,11 @@ export default async function EpisodeDetailPage({
 
   const detail = await getEpisodeDetail(supabase, site.id, episode.id, range.from, range.to);
   const noData = detail.overview.listens === 0;
+  const podcasts = await getPodcastsForSite(supabase, site.id);
+  const isPodbean = podcasts.find((p) => p.id === episode.podcastId)?.hostingProvider === "podbean";
   const [podbeanMetricsByEpisode, finalizedThrough] = await Promise.all([
-    getPodbeanEpisodesMetrics(supabase, [episode.podcastId]),
-    getPodbeanFinalizedThroughForEpisode(supabase, episode.id),
+    getPodbeanEpisodesMetrics(supabase, isPodbean ? [episode.podcastId] : []),
+    isPodbean ? getPodbeanFinalizedThroughForEpisode(supabase, episode.id) : Promise.resolve(null),
   ]);
   const podbeanMetrics = podbeanMetricsByEpisode.get(episode.id) ?? null;
 
@@ -116,36 +118,43 @@ export default async function EpisodeDetailPage({
         </div>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-orange-200 bg-orange-50/40 p-5">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center rounded-full bg-orange-600 px-2.5 py-0.5 text-xs font-semibold text-white">Podbean</span>
-          <h2 className="text-sm font-semibold text-[var(--foreground)]">Podbean Analytics</h2>
+      {isPodbean ? (
+        <div className="space-y-4 rounded-xl border border-orange-200 bg-orange-50/40 p-5">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-orange-600 px-2.5 py-0.5 text-xs font-semibold text-white">Podbean</span>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Podbean Analytics</h2>
+          </div>
+          {podbeanMetrics ? (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <KpiCardSmall label="Downloads (all-time)" value={podbeanMetrics.downloadsAllTime.toLocaleString()} />
+                <KpiCardSmall label="Listeners" value={podbeanMetrics.listeners != null ? podbeanMetrics.listeners.toLocaleString() : "–"} />
+                <KpiCardSmall
+                  label="Engaged listeners"
+                  value={podbeanMetrics.engagedListeners != null ? podbeanMetrics.engagedListeners.toLocaleString() : "–"}
+                />
+                <KpiCardSmall label="Avg consumption rate" value={formatPercent(podbeanMetrics.avgConsumptionRate)} />
+              </div>
+              <p className="text-xs text-[var(--muted)]">
+                Avg consumption time: {formatSeconds(podbeanMetrics.avgConsumptionTimeSeconds)}
+                {podbeanMetrics.engagementStatDate
+                  ? ` · listener/engagement figures as of ${new Date(`${podbeanMetrics.engagementStatDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                  : ""}
+                {finalizedThrough
+                  ? ` · downloads finalized through ${new Date(`${finalizedThrough}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                  : ""}
+              </p>
+            </>
+          ) : (
+            <p className="py-2 text-center text-sm text-[var(--muted)]">Not mapped to Podbean, or no Podbean data synced for this episode yet.</p>
+          )}
         </div>
-        {podbeanMetrics ? (
-          <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <KpiCardSmall label="Downloads (all-time)" value={podbeanMetrics.downloadsAllTime.toLocaleString()} />
-              <KpiCardSmall label="Listeners" value={podbeanMetrics.listeners != null ? podbeanMetrics.listeners.toLocaleString() : "–"} />
-              <KpiCardSmall
-                label="Engaged listeners"
-                value={podbeanMetrics.engagedListeners != null ? podbeanMetrics.engagedListeners.toLocaleString() : "–"}
-              />
-              <KpiCardSmall label="Avg consumption rate" value={formatPercent(podbeanMetrics.avgConsumptionRate)} />
-            </div>
-            <p className="text-xs text-[var(--muted)]">
-              Avg consumption time: {formatSeconds(podbeanMetrics.avgConsumptionTimeSeconds)}
-              {podbeanMetrics.engagementStatDate
-                ? ` · listener/engagement figures as of ${new Date(`${podbeanMetrics.engagementStatDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
-                : ""}
-              {finalizedThrough
-                ? ` · downloads finalized through ${new Date(`${finalizedThrough}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
-                : ""}
-            </p>
-          </>
-        ) : (
-          <p className="py-2 text-center text-sm text-[var(--muted)]">Not mapped to Podbean, or no Podbean data synced for this episode yet.</p>
-        )}
-      </div>
+      ) : (
+        <p className="text-xs text-[var(--muted)]">
+          Hosting analytics are not connected for this podcast. Episode metadata is synced from its RSS feed; listening metrics measured by
+          PulseOS are shown below.
+        </p>
+      )}
 
       <div>
         <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">PulseOS Web Player</h2>
@@ -162,7 +171,7 @@ export default async function EpisodeDetailPage({
           <p className="text-lg font-medium text-[var(--foreground)]">No Web Player listening data yet</p>
           <p className="max-w-sm text-sm text-[var(--muted)]">
             PulseOS&apos;s own audio player and listening-progress tracking aren&apos;t built yet, so this funnel, sources, and platform activity
-            stay empty for now. Podbean&apos;s hosting analytics above are unaffected.
+            stay empty for now.{isPodbean ? " Podbean's hosting analytics above are unaffected." : ""}
           </p>
         </div>
       ) : (

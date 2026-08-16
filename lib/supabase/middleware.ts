@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/collect", "/api/cron/podbean-sync", "/api/admin/podbean-backfill", "/api/content"];
+const PUBLIC_PATHS = ["/login", "/api/collect", "/api/cron/podbean-sync", "/api/cron/rss-sync", "/api/admin/podbean-backfill", "/api/content"];
 
 function isPublicPath(pathname: string) {
   return (

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/podbean-sync",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/rss-sync",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

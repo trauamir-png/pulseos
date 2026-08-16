@@ -75,8 +75,11 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
   const noData = summary.totalListens === 0 && summary.listeningNow === 0;
   const detailQuery = dashboardQueryString({ siteId: site.id, range: params.range, from: params.from, to: params.to });
 
+  const podbeanPodcasts = podcasts.filter((p) => p.hostingProvider === "podbean");
+  const nonPodbeanPodcasts = podcasts.filter((p) => p.hostingProvider !== "podbean");
+
   const podbeanSections = await Promise.all(
-    podcasts.map(async (podcast) => {
+    podbeanPodcasts.map(async (podcast) => {
       const [
         mappedCountRes,
         downloadsSummary,
@@ -165,6 +168,12 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
             sourcesAllTime={s.sourcesAllTime}
             finalizedThrough={s.finalizedThrough}
           />
+        ))}
+        {nonPodbeanPodcasts.map((podcast) => (
+          <p key={podcast.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 text-xs text-[var(--muted)]">
+            Hosting analytics are not connected for {podcast.name}. Episode information is synced from its RSS feed; listening metrics measured
+            by PulseOS are shown below and on each episode&apos;s detail page.
+          </p>
         ))}
       </div>
 

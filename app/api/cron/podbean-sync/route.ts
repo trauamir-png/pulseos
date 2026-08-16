@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: podcasts, error } = await admin.from("podcasts").select("id, name").eq("active", true);
+  // Only podcasts explicitly identified as Podbean-hosted (see migration 0010) --
+  // Podbean's GET /podcast is account-scoped, not feed-scoped, so running this
+  // against a non-Podbean podcast would silently overwrite its podbean_podcast_id
+  // with the wrong show's identity.
+  const { data: podcasts, error } = await admin.from("podcasts").select("id, name").eq("active", true).eq("hosting_provider", "podbean");
 
   if (error) {
     return NextResponse.json({ error: "db_error", detail: error.message }, { status: 500 });

@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAndParseFeed, RssParseError, type ParsedEpisode } from "@/lib/rss/parse";
+import { detectHostingProvider } from "@/lib/rss/hosting-provider";
 import type { Database } from "@/lib/supabase/types";
 
 type EpisodeInsert = Database["public"]["Tables"]["episodes"]["Insert"];
@@ -60,8 +62,8 @@ function fieldsChanged(existing: EpisodeRow, incoming: Omit<EpisodeInsert, "id" 
  * disappears from the RSS feed is left alone, per spec) and never touches
  * episode analytics -- only the episodes table's own metadata columns.
  */
-async function applyFeedEpisodes(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+export async function applyFeedEpisodes(
+  supabase: SupabaseClient<Database>,
   podcastId: string,
   items: ParsedEpisode[],
 ): Promise<{ added: number; updated: number; unchanged: number }> {
@@ -125,6 +127,7 @@ export async function connectPodcast(siteId: string, rssUrl: string) {
       language: feed.podcast.language,
       author: feed.podcast.author,
       rss_url: trimmedUrl,
+      hosting_provider: detectHostingProvider(trimmedUrl),
       rss_last_synced_at: new Date().toISOString(),
       rss_last_sync_status: "success",
       rss_last_error: null,
@@ -141,11 +144,17 @@ export async function connectPodcast(siteId: string, rssUrl: string) {
   return { podcastId: podcast.id, name: podcast.name, added };
 }
 
-export async function syncPodcastRss(podcastId: string) {
-  const supabase = await createClient();
-
-  const { data: podcast, error: fetchError } = await supabase.from("podcasts").select("id, rss_url").eq("id", podcastId).single();
-  if (fetchError) throw new Error(fetchError.message);
+/**
+ * Fetches a podcast's saved RSS feed, upserts its episodes by GUID, and
+ * refreshes the podcast's own metadata + sync status columns. Provider-
+ * agnostic and client-agnostic (works with the cookie-bound dashboard client
+ * or the service-role admin client), so both the "Sync now" server action
+ * below and any future cron job can share this one code path.
+ */
+export async function syncPodcastFeed(
+  supabase: SupabaseClient<Database>,
+  podcast: { id: string; rss_url: string | null },
+): Promise<{ added: number; updated: number; unchanged: number }> {
   if (!podcast.rss_url) throw new Error("This podcast has no RSS URL configured.");
 
   let feed;
@@ -156,12 +165,11 @@ export async function syncPodcastRss(podcastId: string) {
     await supabase
       .from("podcasts")
       .update({ rss_last_sync_status: "error", rss_last_error: message })
-      .eq("id", podcastId);
-    revalidatePath("/podcast");
+      .eq("id", podcast.id);
     throw new Error(message);
   }
 
-  const summary = await applyFeedEpisodes(supabase, podcastId, feed.episodes);
+  const summary = await applyFeedEpisodes(supabase, podcast.id, feed.episodes);
 
   const { error: updateError } = await supabase
     .from("podcasts")
@@ -170,17 +178,32 @@ export async function syncPodcastRss(podcastId: string) {
       description: feed.podcast.description,
       artwork_url: feed.podcast.artworkUrl,
       website_url: feed.podcast.websiteUrl,
+      hosting_provider: detectHostingProvider(podcast.rss_url),
       language: feed.podcast.language,
       author: feed.podcast.author,
       rss_last_synced_at: new Date().toISOString(),
       rss_last_sync_status: "success",
       rss_last_error: null,
     })
-    .eq("id", podcastId);
+    .eq("id", podcast.id);
   if (updateError) throw new Error(updateError.message);
 
-  revalidatePath("/podcast");
-  revalidatePath("/podcast/episodes");
+  return summary;
+}
 
+export async function syncPodcastRss(podcastId: string) {
+  const supabase = await createClient();
+
+  const { data: podcast, error: fetchError } = await supabase.from("podcasts").select("id, rss_url").eq("id", podcastId).single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  let summary;
+  try {
+    summary = await syncPodcastFeed(supabase, podcast);
+  } finally {
+    revalidatePath("/podcast");
+  }
+
+  revalidatePath("/podcast/episodes");
   return summary;
 }

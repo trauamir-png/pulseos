@@ -171,6 +171,7 @@ export interface Database {
           artwork_url: string | null;
           website_url: string | null;
           rss_url: string | null;
+          hosting_provider: string | null;
           language: string | null;
           author: string | null;
           rss_last_synced_at: string | null;
@@ -192,6 +193,7 @@ export interface Database {
           artwork_url?: string | null;
           website_url?: string | null;
           rss_url?: string | null;
+          hosting_provider?: string | null;
           language?: string | null;
           author?: string | null;
           rss_last_synced_at?: string | null;

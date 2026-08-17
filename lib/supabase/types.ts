@@ -507,6 +507,7 @@ export interface Database {
           seo_title: string | null;
           meta_description: string | null;
           og_image_id: string | null;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -527,6 +528,7 @@ export interface Database {
           seo_title?: string | null;
           meta_description?: string | null;
           og_image_id?: string | null;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -573,12 +575,100 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["banners"]["Insert"]>;
         Relationships: [];
       };
+      profiles: {
+        Row: {
+          id: string;
+          display_name: string;
+          active: boolean;
+          is_admin: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          display_name: string;
+          active?: boolean;
+          is_admin?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
+      };
+      site_memberships: {
+        Row: {
+          id: string;
+          site_id: string;
+          user_id: string;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          user_id: string;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["site_memberships"]["Insert"]>;
+        Relationships: [];
+      };
+      permission_definitions: {
+        Row: {
+          key: string;
+          category: string;
+          label: string;
+          description: string | null;
+          sort_order: number;
+        };
+        Insert: {
+          key: string;
+          category: string;
+          label: string;
+          description?: string | null;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["permission_definitions"]["Insert"]>;
+        Relationships: [];
+      };
+      membership_permissions: {
+        Row: {
+          membership_id: string;
+          permission_key: string;
+          created_at: string;
+        };
+        Insert: {
+          membership_id: string;
+          permission_key: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["membership_permissions"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       increment_rate_limit: {
         Args: { p_site_id: string; p_minute_bucket: string };
         Returns: number;
+      };
+      is_admin: {
+        Args: { p_user_id?: string };
+        Returns: boolean;
+      };
+      has_permission: {
+        Args: { p_site_id: string; p_permission: string };
+        Returns: boolean;
+      };
+      permissions_for_site: {
+        Args: { p_site_id: string };
+        Returns: string[];
+      };
+      accessible_site_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
       };
     };
     Enums: Record<string, never>;

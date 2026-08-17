@@ -62,6 +62,7 @@ export async function createColumn(siteId: string, input: ColumnInput) {
 
   const supabase = await createClient();
   const slug = await uniqueSlug(supabase, "columns", siteId, input.slug || input.title);
+  const { data: userData } = await supabase.auth.getUser();
 
   const { data, error } = await supabase
     .from("columns")
@@ -79,6 +80,7 @@ export async function createColumn(siteId: string, input: ColumnInput) {
       seo_title: input.seoTitle.trim() || null,
       meta_description: input.metaDescription.trim() || null,
       og_image_id: input.ogImageId,
+      created_by: userData.user?.id ?? null,
     })
     .select("id")
     .single();

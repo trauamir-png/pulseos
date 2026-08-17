@@ -5,6 +5,9 @@ import { requireModule } from "@/lib/dashboard/modules";
 import { getBannerById } from "@/lib/dashboard/content-banners";
 import { getMediaForSite } from "@/lib/dashboard/content-media";
 import { BannerForm } from "@/components/content/banner-form";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 export default async function EditBannerPage({
   params,
@@ -16,9 +19,14 @@ export default async function EditBannerPage({
   const { id } = await params;
   const searchParamsResolved = await searchParams;
   const { site } = await resolveDashboardContext(searchParamsResolved);
+  if (!site) return <NoSiteAccess />;
   requireModule(site, "content_management");
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.CONTENT_BANNERS_MANAGE))) {
+    return <AccessDenied />;
+  }
+
   const [banner, media] = await Promise.all([getBannerById(supabase, site.id, id), getMediaForSite(supabase, site.id)]);
   const query = dashboardQueryString({ siteId: site.id, range: searchParamsResolved.range, from: searchParamsResolved.from, to: searchParamsResolved.to });
 

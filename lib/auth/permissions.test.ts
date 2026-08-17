@@ -3,7 +3,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 import * as permissions from "@/lib/auth/permissions";
-import { ForbiddenError, canAccessSite, getAccessibleSiteIds, getPermissionsForSite, hasPermission, isAdmin, requirePermission } from "@/lib/auth/permissions";
+import {
+  ForbiddenError,
+  SiteAccessError,
+  canAccessSite,
+  getAccessibleSiteIds,
+  getPermissionsForSite,
+  hasPermission,
+  isAdmin,
+  requirePermission,
+  requireSiteAccess,
+} from "@/lib/auth/permissions";
 
 /**
  * These are unit tests of the TS authorization wrapper's contract against a
@@ -17,8 +27,9 @@ import { ForbiddenError, canAccessSite, getAccessibleSiteIds, getPermissionsForS
  */
 
 type RpcHandler = (name: string, args?: Record<string, unknown>) => { data: unknown; error: unknown };
+type FakeProfile = { display_name: string; active: boolean; is_admin: boolean };
 
-function fakeSupabase(opts: { rpc?: RpcHandler; user?: { id: string } | null } = {}) {
+function fakeSupabase(opts: { rpc?: RpcHandler; user?: { id: string } | null; profile?: FakeProfile | null } = {}) {
   return {
     auth: {
       getUser: async () => ({ data: { user: opts.user ?? null } }),
@@ -28,7 +39,7 @@ function fakeSupabase(opts: { rpc?: RpcHandler; user?: { id: string } | null } =
     from: () => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: null }),
+          maybeSingle: async () => ({ data: opts.user && opts.profile !== undefined ? opts.profile : null }),
         }),
       }),
     }),
@@ -136,6 +147,55 @@ describe("requirePermission", () => {
   it("resolves without throwing when the permission is granted", async () => {
     const supabase = fakeSupabase({ rpc: () => ({ data: true, error: null }) });
     await expect(requirePermission(supabase, "site-a", PERMISSIONS.CONTENT_COLUMNS_VIEW)).resolves.toBeUndefined();
+  });
+});
+
+describe("requireSiteAccess -- the central site-context gate (Phase 2, Section 2/14)", () => {
+  it("throws SiteAccessError for an unauthenticated caller", async () => {
+    const supabase = fakeSupabase({ user: null });
+    await expect(requireSiteAccess(supabase, "site-a")).rejects.toBeInstanceOf(SiteAccessError);
+  });
+
+  it("throws SiteAccessError when the profile is inactive, even if the RPC would otherwise grant access", async () => {
+    const supabase = fakeSupabase({
+      user: { id: "u1" },
+      profile: { display_name: "Inactive", active: false, is_admin: false },
+      rpc: () => ({ data: ["site-a"], error: null }),
+    });
+    await expect(requireSiteAccess(supabase, "site-a")).rejects.toBeInstanceOf(SiteAccessError);
+  });
+
+  it("Admin bypasses the membership check entirely -- no accessible_site_ids call needed to grant access", async () => {
+    const supabase = fakeSupabase({
+      user: { id: "admin-1" },
+      profile: { display_name: "Admin", active: true, is_admin: true },
+      rpc: () => {
+        throw new Error("accessible_site_ids should not be called for an Admin");
+      },
+    });
+    await expect(requireSiteAccess(supabase, "any-site-not-a-member-of")).resolves.toBeUndefined();
+  });
+
+  it("site isolation: a member of Site A is denied access to Site B, even by directly calling requireSiteAccess with Site B's id", async () => {
+    const supabase = fakeSupabase({
+      user: { id: "writer-1" },
+      profile: { display_name: "Writer", active: true, is_admin: false },
+      rpc: (name) => {
+        if (name !== "accessible_site_ids") throw new Error(`unexpected rpc ${name}`);
+        return { data: ["site-a"], error: null };
+      },
+    });
+    await expect(requireSiteAccess(supabase, "site-a")).resolves.toBeUndefined();
+    await expect(requireSiteAccess(supabase, "site-b")).rejects.toBeInstanceOf(SiteAccessError);
+  });
+
+  it("a non-Admin with no membership rows at all is denied every site (safe default, not open-by-default)", async () => {
+    const supabase = fakeSupabase({
+      user: { id: "writer-1" },
+      profile: { display_name: "Writer", active: true, is_admin: false },
+      rpc: () => ({ data: [], error: null }),
+    });
+    await expect(requireSiteAccess(supabase, "site-a")).rejects.toBeInstanceOf(SiteAccessError);
   });
 });
 

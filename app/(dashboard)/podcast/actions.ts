@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAndParseFeed, RssParseError, type ParsedEpisode } from "@/lib/rss/parse";
 import { detectHostingProvider, HOSTING_PROVIDER_OPTIONS } from "@/lib/rss/hosting-provider";
 import type { Database } from "@/lib/supabase/types";
+import { requireSiteAccess, requirePermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 const VALID_PROVIDERS = new Set(HOSTING_PROVIDER_OPTIONS.map((o) => o.value));
 
@@ -121,6 +123,8 @@ export async function connectPodcast(siteId: string, rssUrl: string, hostingProv
   if (!trimmedUrl) throw new Error("RSS URL is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.PODCAST_OVERVIEW_VIEW);
 
   let feed;
   try {
@@ -226,6 +230,15 @@ export async function updatePodcastSettings(
 ) {
   const supabase = await createClient();
 
+  const { data: podcastForAccess, error: accessFetchError } = await supabase
+    .from("podcasts")
+    .select("site_id")
+    .eq("id", podcastId)
+    .single();
+  if (accessFetchError) throw new Error(accessFetchError.message);
+  await requireSiteAccess(supabase, podcastForAccess.site_id);
+  await requirePermission(supabase, podcastForAccess.site_id, PERMISSIONS.PODCAST_OVERVIEW_VIEW);
+
   const nextProvider = updates.hostingProvider !== undefined ? normalizeHostingProvider(updates.hostingProvider) : undefined;
   const nextRssUrl = updates.rssUrl?.trim();
 
@@ -266,8 +279,10 @@ export async function updatePodcastSettings(
 export async function syncPodcastRss(podcastId: string) {
   const supabase = await createClient();
 
-  const { data: podcast, error: fetchError } = await supabase.from("podcasts").select("id, rss_url").eq("id", podcastId).single();
+  const { data: podcast, error: fetchError } = await supabase.from("podcasts").select("id, site_id, rss_url").eq("id", podcastId).single();
   if (fetchError) throw new Error(fetchError.message);
+  await requireSiteAccess(supabase, podcast.site_id);
+  await requirePermission(supabase, podcast.site_id, PERMISSIONS.PODCAST_OVERVIEW_VIEW);
 
   let summary;
   try {

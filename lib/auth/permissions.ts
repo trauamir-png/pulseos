@@ -86,3 +86,34 @@ export async function requirePermission(supabase: Supa, siteId: string, permissi
     throw new ForbiddenError(permission, siteId);
   }
 }
+
+export class SiteAccessError extends Error {
+  constructor(siteId: string) {
+    super(`No access to site "${siteId}".`);
+    this.name = "SiteAccessError";
+  }
+}
+
+/**
+ * The single centralized site-context gate: (1) authenticated, (2) profile
+ * active, (3) site accessible -- Admin bypasses membership, everyone else
+ * needs an active site_membership row. Fails closed on every branch. Every
+ * page/Server Action that receives a site ID from a query param or client
+ * input must run it through here (or through `hasPermission`, which calls
+ * `has_permission` and carries the same Admin-bypass) before touching that
+ * site's data.
+ *
+ * Re-checks `profile.active` explicitly here because the underlying SQL
+ * (has_permission / accessible_site_ids in 0012_site_permissions.sql) only
+ * gates the Admin-bypass branch on `profiles.active` -- the membership branch
+ * for ordinary users currently checks `site_memberships.active` only, not
+ * `profiles.active`. This is flagged as a known gap for a future migration;
+ * this app-layer check closes it for every caller that goes through
+ * requireSiteAccess in the meantime.
+ */
+export async function requireSiteAccess(supabase: Supa, siteId: string): Promise<void> {
+  const profile = await getCurrentProfile(supabase);
+  if (!profile || !profile.active) throw new SiteAccessError(siteId);
+  if (profile.isAdmin) return;
+  if (!(await canAccessSite(supabase, siteId))) throw new SiteAccessError(siteId);
+}

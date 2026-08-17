@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { getEventDetail } from "@/lib/dashboard/queries";
 import { SimpleAreaChart } from "@/components/simple-area-chart";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 export default async function EventDetailPage({
   params,
@@ -17,9 +20,13 @@ export default async function EventDetailPage({
   const sp = await searchParams;
   const { site, range } = await resolveDashboardContext(sp);
 
-  if (!site) return <p className="text-sm text-[var(--muted)]">No site selected.</p>;
+  if (!site) return <NoSiteAccess />;
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.ANALYTICS_EVENTS_VIEW))) {
+    return <AccessDenied />;
+  }
+
   const detail = await getEventDetail(supabase, site.id, eventName, range.from, range.to, range.timezone, range.granularity);
   const query = new URLSearchParams(sp as Record<string, string>).toString();
 

@@ -3,6 +3,12 @@
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/auth/permissions";
+
+/** Sites administration is Admin-only for this phase -- see Phase 2 report Section 9. */
+async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
+  if (!(await isAdmin(supabase))) throw new Error("Admin access required.");
+}
 
 export async function createSite(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
@@ -15,6 +21,8 @@ export async function createSite(formData: FormData) {
   }
 
   const supabase = await createClient();
+  await requireAdmin(supabase);
+
   const siteKey = randomBytes(16).toString("hex");
 
   const { data: site, error } = await supabase
@@ -41,6 +49,7 @@ export async function createSite(formData: FormData) {
 
 export async function toggleSiteActive(siteId: string, active: boolean) {
   const supabase = await createClient();
+  await requireAdmin(supabase);
   const { error } = await supabase.from("sites").update({ active }).eq("id", siteId);
   if (error) throw new Error(error.message);
   revalidatePath("/sites");
@@ -51,6 +60,7 @@ export async function setSiteDomain(siteId: string, domain: string) {
   if (!trimmed) throw new Error("Domain is required.");
 
   const supabase = await createClient();
+  await requireAdmin(supabase);
   const { error } = await supabase.from("sites").update({ domain: trimmed }).eq("id", siteId);
   if (error) throw new Error(error.message);
   revalidatePath("/sites");
@@ -58,6 +68,7 @@ export async function setSiteDomain(siteId: string, domain: string) {
 
 export async function toggleSiteModule(siteId: string, moduleKey: string, active: boolean) {
   const supabase = await createClient();
+  await requireAdmin(supabase);
 
   if (moduleKey === "web_analytics" && active) {
     const { data: site, error: siteError } = await supabase.from("sites").select("domain").eq("id", siteId).single();
@@ -82,6 +93,7 @@ export async function toggleSiteModule(siteId: string, moduleKey: string, active
  */
 export async function deleteSite(siteId: string, confirmName: string) {
   const supabase = await createClient();
+  await requireAdmin(supabase);
 
   const { data: site, error: fetchError } = await supabase.from("sites").select("name").eq("id", siteId).single();
   if (fetchError) throw new Error(fetchError.message);

@@ -19,6 +19,9 @@ export function ColumnForm({
   authors,
   categories,
   media,
+  canPublish = false,
+  canSchedule = false,
+  canDelete = false,
 }: {
   siteId: string;
   query: string;
@@ -26,6 +29,12 @@ export function ColumnForm({
   authors: AuthorRecord[];
   categories: CategoryRecord[];
   media: MediaAssetRecord[];
+  /** Controls the Publish/Unpublish, Schedule/Cancel-schedule, and Delete controls below --
+   * mirrors the Server Action's own enforcement in content/actions.ts, so a user who can only
+   * create/edit drafts never sees a control the action would reject anyway (Phase 2, Section 6). */
+  canPublish?: boolean;
+  canSchedule?: boolean;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const listHref = `/content/columns${query}`;
@@ -206,56 +215,60 @@ export function ColumnForm({
                 Preview
               </a>
 
-              <div className="space-y-2 border-t border-[var(--border)] pt-3">
-                {column.status !== "published" && (
-                  <button
-                    onClick={() => handleStatus("published")}
-                    disabled={statusPending}
-                    className="w-full rounded-lg border border-[var(--positive)] px-3 py-2 text-sm font-medium text-[var(--positive)] hover:bg-green-50 disabled:opacity-60"
-                  >
-                    Publish now
-                  </button>
-                )}
-                {column.status === "published" && (
-                  <button
-                    onClick={() => handleStatus("draft")}
-                    disabled={statusPending}
-                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    Unpublish
-                  </button>
-                )}
-                {column.status === "draft" && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="datetime-local"
-                      value={scheduleAt}
-                      onChange={(e) => setScheduleAt(e.target.value)}
-                      className="flex-1 rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 text-xs outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
-                    />
+              {(canPublish || canSchedule) && (
+                <div className="space-y-2 border-t border-[var(--border)] pt-3">
+                  {canPublish && column.status !== "published" && (
                     <button
-                      onClick={() => handleStatus("scheduled")}
-                      disabled={statusPending || !scheduleAt}
-                      className="whitespace-nowrap rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                      onClick={() => handleStatus("published")}
+                      disabled={statusPending}
+                      className="w-full rounded-lg border border-[var(--positive)] px-3 py-2 text-sm font-medium text-[var(--positive)] hover:bg-green-50 disabled:opacity-60"
                     >
-                      Schedule
+                      Publish now
                     </button>
-                  </div>
-                )}
-                {column.status === "scheduled" && (
-                  <button
-                    onClick={() => handleStatus("draft")}
-                    disabled={statusPending}
-                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    Cancel schedule
-                  </button>
-                )}
-              </div>
+                  )}
+                  {canPublish && column.status === "published" && (
+                    <button
+                      onClick={() => handleStatus("draft")}
+                      disabled={statusPending}
+                      className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Unpublish
+                    </button>
+                  )}
+                  {canSchedule && column.status === "draft" && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        value={scheduleAt}
+                        onChange={(e) => setScheduleAt(e.target.value)}
+                        className="flex-1 rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 text-xs outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+                      />
+                      <button
+                        onClick={() => handleStatus("scheduled")}
+                        disabled={statusPending || !scheduleAt}
+                        className="whitespace-nowrap rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                      >
+                        Schedule
+                      </button>
+                    </div>
+                  )}
+                  {canSchedule && column.status === "scheduled" && (
+                    <button
+                      onClick={() => handleStatus("draft")}
+                      disabled={statusPending}
+                      className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Cancel schedule
+                    </button>
+                  )}
+                </div>
+              )}
 
-              <div className="flex justify-end border-t border-[var(--border)] pt-3">
-                <DeleteIconButton title="Delete column" onClick={() => setDeleteOpen(true)} />
-              </div>
+              {canDelete && (
+                <div className="flex justify-end border-t border-[var(--border)] pt-3">
+                  <DeleteIconButton title="Delete column" onClick={() => setDeleteOpen(true)} />
+                </div>
+              )}
             </>
           )}
         </div>

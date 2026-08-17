@@ -20,32 +20,39 @@ import {
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
+import { PERMISSIONS, type PermissionKey } from "@/lib/auth/permission-definitions";
 
-const WEB_ANALYTICS_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/realtime", label: "Realtime", icon: Radio },
-  { href: "/pages", label: "Pages", icon: FileText },
-  { href: "/sources", label: "Sources", icon: Share2 },
-  { href: "/events", label: "Events", icon: Zap },
+export const WEB_ANALYTICS_ITEMS = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: PERMISSIONS.ANALYTICS_DASHBOARD_VIEW },
+  { href: "/realtime", label: "Realtime", icon: Radio, permission: PERMISSIONS.ANALYTICS_REALTIME_VIEW },
+  { href: "/pages", label: "Pages", icon: FileText, permission: PERMISSIONS.ANALYTICS_PAGES_VIEW },
+  { href: "/sources", label: "Sources", icon: Share2, permission: PERMISSIONS.ANALYTICS_SOURCES_VIEW },
+  { href: "/events", label: "Events", icon: Zap, permission: PERMISSIONS.ANALYTICS_EVENTS_VIEW },
 ];
 
-const PODCAST_ANALYTICS_ITEMS = [
-  { href: "/podcast", label: "Overview", icon: Mic },
-  { href: "/podcast/episodes", label: "Episodes", icon: ListMusic },
+export const PODCAST_ANALYTICS_ITEMS = [
+  { href: "/podcast", label: "Overview", icon: Mic, permission: PERMISSIONS.PODCAST_OVERVIEW_VIEW },
+  { href: "/podcast/episodes", label: "Episodes", icon: ListMusic, permission: PERMISSIONS.PODCAST_EPISODES_VIEW },
 ];
 
-const CONTENT_ITEMS = [
-  { href: "/content/columns", label: "Columns", icon: Newspaper },
-  { href: "/content/banners", label: "Banners", icon: GalleryHorizontal },
-  { href: "/content/media", label: "Media", icon: ImageIcon },
-  { href: "/content/authors", label: "Authors", icon: Users },
-  { href: "/content/categories", label: "Categories", icon: Tag },
+export const CONTENT_ITEMS = [
+  { href: "/content/columns", label: "Columns", icon: Newspaper, permission: PERMISSIONS.CONTENT_COLUMNS_VIEW },
+  { href: "/content/banners", label: "Banners", icon: GalleryHorizontal, permission: PERMISSIONS.CONTENT_BANNERS_MANAGE },
+  { href: "/content/media", label: "Media", icon: ImageIcon, permission: PERMISSIONS.CONTENT_MEDIA_MANAGE },
+  { href: "/content/authors", label: "Authors", icon: Users, permission: PERMISSIONS.CONTENT_AUTHORS_MANAGE },
+  { href: "/content/categories", label: "Categories", icon: Tag, permission: PERMISSIONS.CONTENT_CATEGORIES_MANAGE },
 ];
 
-const GLOBAL_ITEMS = [
+/** Admin-only, not permission-gated: see the Phase 2 report for why (be conservative -- no site-scoped equivalent exists yet for these two). */
+export const GLOBAL_ITEMS = [
   { href: "/sites", label: "Sites", icon: Globe },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+/** Pure visibility rule shared by the Sidebar render logic and its tests: Admin sees everything, everyone else needs the item's permission. */
+export function canSeeNavItem(isAdmin: boolean, permissions: ReadonlySet<PermissionKey>, item: { permission: PermissionKey }): boolean {
+  return isAdmin || permissions.has(item.permission);
+}
 
 const ALL_NAV_ITEMS = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...GLOBAL_ITEMS];
 
@@ -66,7 +73,15 @@ function activeHrefFor(pathname: string) {
   return matches.sort((a, b) => b.href.length - a.href.length)[0]?.href;
 }
 
-export function Sidebar({ sites }: { sites: SiteRecord[] }) {
+export function Sidebar({
+  sites,
+  isAdmin,
+  permissionsBySite,
+}: {
+  sites: SiteRecord[];
+  isAdmin: boolean;
+  permissionsBySite: Record<string, PermissionKey[]>;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const query = searchParams.toString();
@@ -74,9 +89,15 @@ export function Sidebar({ sites }: { sites: SiteRecord[] }) {
   const requestedId = searchParams.get("site") ?? undefined;
   const site = (requestedId ? sites.find((s) => s.id === requestedId) : undefined) ?? sites.find((s) => s.active) ?? sites[0] ?? null;
 
+  const permissions = new Set(site ? permissionsBySite[site.id] ?? [] : []);
+
   const showWebAnalytics = hasModule(site, "web_analytics");
   const showPodcastAnalytics = hasModule(site, "podcast_analytics");
   const showContent = hasModule(site, "content_management");
+
+  const visibleWebAnalytics = WEB_ANALYTICS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
+  const visiblePodcastAnalytics = PODCAST_ANALYTICS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
+  const visibleContent = CONTENT_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
 
   const activeHref = activeHrefFor(pathname);
 
@@ -107,27 +128,29 @@ export function Sidebar({ sites }: { sites: SiteRecord[] }) {
         <span className="text-base font-semibold text-[var(--foreground)]">PulseOS</span>
       </div>
       <nav className="flex-1 space-y-4 px-3">
-        {showWebAnalytics && (
+        {showWebAnalytics && visibleWebAnalytics.length > 0 && (
           <div className="space-y-0.5">
-            {WEB_ANALYTICS_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}
+            {visibleWebAnalytics.map(({ href, label, icon }) => renderLink(href, label, icon))}
           </div>
         )}
 
-        {showPodcastAnalytics && (
+        {showPodcastAnalytics && visiblePodcastAnalytics.length > 0 && (
           <div className="space-y-0.5">
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Podcast Analytics</p>
-            {PODCAST_ANALYTICS_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}
+            {visiblePodcastAnalytics.map(({ href, label, icon }) => renderLink(href, label, icon))}
           </div>
         )}
 
-        {showContent && (
+        {showContent && visibleContent.length > 0 && (
           <div className="space-y-0.5">
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Content</p>
-            {CONTENT_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}
+            {visibleContent.map(({ href, label, icon }) => renderLink(href, label, icon))}
           </div>
         )}
 
-        <div className="space-y-0.5">{GLOBAL_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}</div>
+        {isAdmin && (
+          <div className="space-y-0.5">{GLOBAL_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}</div>
+        )}
       </nav>
     </aside>
   );

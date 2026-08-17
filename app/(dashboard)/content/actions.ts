@@ -7,9 +7,11 @@ import { sanitizeColumnBody } from "@/lib/content/sanitize";
 import { slugify } from "@/lib/content/slug";
 import { countColumnsByAuthor } from "@/lib/dashboard/content-authors";
 import { countColumnsByCategory } from "@/lib/dashboard/content-categories";
-import type { ColumnStatus } from "@/lib/dashboard/content-columns";
+import { getColumnOwnership, type ColumnStatus } from "@/lib/dashboard/content-columns";
 import type { BannerPlacement } from "@/lib/dashboard/content-banners";
 import type { Database } from "@/lib/supabase/types";
+import { requireSiteAccess, requirePermission, getCurrentUser, hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 const CONTENT_PATHS = ["/content/columns", "/content/authors", "/content/categories", "/content/media", "/content/banners"];
 
@@ -61,6 +63,9 @@ export async function createColumn(siteId: string, input: ColumnInput) {
   if (!input.categoryId) throw new Error("Category is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_CREATE);
+
   const slug = await uniqueSlug(supabase, "columns", siteId, input.slug || input.title);
   const { data: userData } = await supabase.auth.getUser();
 
@@ -96,6 +101,21 @@ export async function updateColumn(siteId: string, id: string, input: ColumnInpu
   if (!input.categoryId) throw new Error("Category is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+
+  const existing = await getColumnOwnership(supabase, siteId, id);
+  if (!existing) throw new Error("Column not found.");
+
+  const [user, canEditAll, canEditOwn] = await Promise.all([
+    getCurrentUser(supabase),
+    hasPermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_EDIT_ALL),
+    hasPermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_EDIT_OWN),
+  ]);
+  const isOwner = user != null && existing.createdBy === user.id;
+  if (!canEditAll && !(canEditOwn && isOwner)) {
+    throw new Error("You do not have permission to edit this column.");
+  }
+
   const slug = await uniqueSlug(supabase, "columns", siteId, input.slug || input.title, id);
 
   const { error } = await supabase
@@ -123,6 +143,22 @@ export async function updateColumn(siteId: string, id: string, input: ColumnInpu
 
 export async function setColumnStatus(siteId: string, id: string, status: ColumnStatus, scheduledAt?: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+
+  const existing = await getColumnOwnership(supabase, siteId, id);
+  if (!existing) throw new Error("Column not found.");
+
+  if (status === "published") {
+    await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_PUBLISH);
+  } else if (status === "scheduled") {
+    await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_SCHEDULE);
+  } else if (existing.status === "published") {
+    // Unpublishing back to draft requires the same permission as publishing.
+    await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_PUBLISH);
+  } else if (existing.status === "scheduled") {
+    // Cancelling a schedule requires the same permission as scheduling.
+    await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_SCHEDULE);
+  }
 
   const patch: Database["public"]["Tables"]["columns"]["Update"] = { status, updated_at: new Date().toISOString() };
 
@@ -146,6 +182,9 @@ export async function setColumnStatus(siteId: string, id: string, status: Column
 
 export async function deleteColumn(siteId: string, id: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_COLUMNS_DELETE);
+
   const { data, error } = await supabase.from("columns").delete().eq("id", id).eq("site_id", siteId).select("id");
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
@@ -172,6 +211,9 @@ export async function createAuthor(siteId: string, input: AuthorInput) {
   if (!input.name.trim()) throw new Error("Name is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_AUTHORS_MANAGE);
+
   const slug = await uniqueSlug(supabase, "authors", siteId, input.slug || input.name);
 
   const { error } = await supabase.from("authors").insert({
@@ -194,6 +236,9 @@ export async function updateAuthor(siteId: string, id: string, input: AuthorInpu
   if (!input.name.trim()) throw new Error("Name is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_AUTHORS_MANAGE);
+
   const slug = await uniqueSlug(supabase, "authors", siteId, input.slug || input.name, id);
 
   const { error } = await supabase
@@ -218,6 +263,8 @@ export async function updateAuthor(siteId: string, id: string, input: AuthorInpu
 
 export async function deleteAuthor(siteId: string, id: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_AUTHORS_MANAGE);
 
   const linked = await countColumnsByAuthor(supabase, siteId, id);
   if (linked > 0) {
@@ -246,6 +293,9 @@ export async function createCategory(siteId: string, input: CategoryInput) {
   if (!input.name.trim()) throw new Error("Name is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_CATEGORIES_MANAGE);
+
   const slug = await uniqueSlug(supabase, "categories", siteId, input.slug || input.name);
 
   const { count } = await supabase.from("categories").select("id", { count: "exact", head: true }).eq("site_id", siteId);
@@ -267,6 +317,9 @@ export async function updateCategory(siteId: string, id: string, input: Category
   if (!input.name.trim()) throw new Error("Name is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_CATEGORIES_MANAGE);
+
   const slug = await uniqueSlug(supabase, "categories", siteId, input.slug || input.name, id);
 
   const { error } = await supabase
@@ -287,6 +340,9 @@ export async function updateCategory(siteId: string, id: string, input: Category
 
 export async function reorderCategories(siteId: string, orderedIds: string[]) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_CATEGORIES_MANAGE);
+
   await Promise.all(
     orderedIds.map((id, index) =>
       supabase.from("categories").update({ display_order: index, updated_at: new Date().toISOString() }).eq("id", id).eq("site_id", siteId),
@@ -297,6 +353,8 @@ export async function reorderCategories(siteId: string, orderedIds: string[]) {
 
 export async function deleteCategory(siteId: string, id: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_CATEGORIES_MANAGE);
 
   const linked = await countColumnsByCategory(supabase, siteId, id);
   if (linked > 0) {
@@ -332,6 +390,9 @@ export async function uploadMedia(siteId: string, formData: FormData) {
   const title = String(formData.get("title") || "").trim();
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MEDIA_MANAGE);
+
   const storagePath = `${siteId}/${randomUUID()}-${sanitizeFilename(file.name)}`;
 
   const { error: uploadError } = await supabase.storage.from(MEDIA_BUCKET).upload(storagePath, file, {
@@ -367,6 +428,9 @@ export async function uploadMedia(siteId: string, formData: FormData) {
 
 export async function updateMediaMeta(siteId: string, id: string, altText: string, title: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MEDIA_MANAGE);
+
   const { error } = await supabase
     .from("media_assets")
     .update({ alt_text: altText.trim() || null, title: title.trim() || null, updated_at: new Date().toISOString() })
@@ -378,6 +442,8 @@ export async function updateMediaMeta(siteId: string, id: string, altText: strin
 
 export async function deleteMedia(siteId: string, id: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MEDIA_MANAGE);
 
   const { data: asset, error: fetchError } = await supabase
     .from("media_assets")
@@ -421,6 +487,9 @@ export async function createBanner(siteId: string, input: BannerInput) {
   if (!input.desktopImageId) throw new Error("A desktop image is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_BANNERS_MANAGE);
+
   const { error } = await supabase.from("banners").insert({
     site_id: siteId,
     internal_name: input.internalName.trim(),
@@ -446,6 +515,9 @@ export async function updateBanner(siteId: string, id: string, input: BannerInpu
   if (!input.desktopImageId) throw new Error("A desktop image is required.");
 
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_BANNERS_MANAGE);
+
   const { error } = await supabase
     .from("banners")
     .update({
@@ -472,6 +544,9 @@ export async function updateBanner(siteId: string, id: string, input: BannerInpu
 
 export async function deleteBanner(siteId: string, id: string) {
   const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_BANNERS_MANAGE);
+
   const { data, error } = await supabase.from("banners").delete().eq("id", id).eq("site_id", siteId).select("id");
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");

@@ -24,6 +24,9 @@ import { KpiCard } from "@/components/kpi-card";
 import { PodcastListeningChart } from "@/components/podcast-listening-chart";
 import { ConnectPodcastForm, PodcastRssStatusCard } from "@/components/podcast-rss";
 import { PodbeanSection } from "@/components/podbean-section";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 function formatSeconds(seconds: number | null): string {
   if (seconds == null) return "–";
@@ -35,9 +38,14 @@ function formatSeconds(seconds: number | null): string {
 export default async function PodcastOverviewPage({ searchParams }: { searchParams: Promise<DashboardSearchParams> }) {
   const params = await searchParams;
   const { site, range } = await resolveDashboardContext(params);
+  if (!site) return <NoSiteAccess />;
   requireModule(site, "podcast_analytics");
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.PODCAST_OVERVIEW_VIEW))) {
+    return <AccessDenied />;
+  }
+
   const podcasts = await getPodcastsForSite(supabase, site.id);
 
   if (podcasts.length === 0) {

@@ -6,6 +6,9 @@ import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodesForSite, getPodcastsForSite } from "@/lib/dashboard/podcast";
 import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisodes } from "@/lib/dashboard/podbean-queries";
 import { EpisodesSearch } from "@/components/episodes-search";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 function formatSeconds(seconds: number | null): string {
   if (seconds == null) return "–";
@@ -23,9 +26,14 @@ function formatPercent(rate: number | null): string {
 export default async function PodcastEpisodesPage({ searchParams }: { searchParams: Promise<DashboardSearchParams & { q?: string }> }) {
   const params = await searchParams;
   const { site, range } = await resolveDashboardContext(params);
+  if (!site) return <NoSiteAccess />;
   requireModule(site, "podcast_analytics");
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.PODCAST_EPISODES_VIEW))) {
+    return <AccessDenied />;
+  }
+
   const [allEpisodes, podcasts] = await Promise.all([getEpisodesForSite(supabase, site.id), getPodcastsForSite(supabase, site.id)]);
   const episodes = params.q ? allEpisodes.filter((ep) => ep.title.toLowerCase().includes(params.q!.toLowerCase())) : allEpisodes;
 

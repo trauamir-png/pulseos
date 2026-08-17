@@ -1,11 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashboard/params";
 import { ConversionEventsManager } from "@/components/conversion-events";
+import { AccessDenied } from "@/components/access-denied";
+import { isAdmin } from "@/lib/auth/permissions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<DashboardSearchParams> }) {
   const sp = await searchParams;
   const { site } = await resolveDashboardContext(sp);
   const supabase = await createClient();
+
+  if (!(await isAdmin(supabase))) {
+    return <AccessDenied />;
+  }
 
   const {
     data: { user },

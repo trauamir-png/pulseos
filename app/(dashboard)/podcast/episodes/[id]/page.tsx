@@ -7,6 +7,9 @@ import { getEpisodeById, getPodcastsForSite } from "@/lib/dashboard/podcast";
 import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
 import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisode } from "@/lib/dashboard/podbean-queries";
 import { KpiCard } from "@/components/kpi-card";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 function formatSeconds(seconds: number | null): string {
   if (seconds == null) return "–";
@@ -48,9 +51,14 @@ export default async function EpisodeDetailPage({
   const { id } = await params;
   const searchParamsResolved = await searchParams;
   const { site, range } = await resolveDashboardContext(searchParamsResolved);
+  if (!site) return <NoSiteAccess />;
   requireModule(site, "podcast_analytics");
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.PODCAST_EPISODES_VIEW))) {
+    return <AccessDenied />;
+  }
+
   const episode = await getEpisodeById(supabase, site.id, id);
   const backQuery = dashboardQueryString({ siteId: site.id, range: searchParamsResolved.range, from: searchParamsResolved.from, to: searchParamsResolved.to });
 

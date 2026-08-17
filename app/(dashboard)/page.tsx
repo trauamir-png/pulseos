@@ -4,18 +4,23 @@ import { resolveDashboardContext, type DashboardSearchParams } from "@/lib/dashb
 import { getSummary, getTimeseries } from "@/lib/dashboard/queries";
 import { KpiCard } from "@/components/kpi-card";
 import { TrafficChart } from "@/components/traffic-chart";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission, isAdmin } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<DashboardSearchParams> }) {
   const params = await searchParams;
   const { site, range } = await resolveDashboardContext(params);
+  const supabase = await createClient();
 
   if (!site) {
-    return (
-      <EmptyState />
-    );
+    return (await isAdmin(supabase)) ? <EmptyState /> : <NoSiteAccess />;
   }
 
-  const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.ANALYTICS_DASHBOARD_VIEW))) {
+    return <AccessDenied />;
+  }
+
   const [summary, timeseries] = await Promise.all([
     getSummary(supabase, site.id, range.from, range.to),
     getTimeseries(supabase, site.id, range.from, range.to, range.timezone, range.granularity, "visitors"),

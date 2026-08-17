@@ -6,6 +6,9 @@ import { requireModule } from "@/lib/dashboard/modules";
 import { getColumnsForSite } from "@/lib/dashboard/content-columns";
 import { getCategoriesForSite } from "@/lib/dashboard/content-categories";
 import { ColumnsFilterBar, ColumnsTable } from "@/components/content/columns-list";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 export default async function ColumnsPage({
   searchParams,
@@ -14,9 +17,15 @@ export default async function ColumnsPage({
 }) {
   const params = await searchParams;
   const { site } = await resolveDashboardContext(params);
+  if (!site) return <NoSiteAccess />;
   requireModule(site, "content_management");
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.CONTENT_COLUMNS_VIEW))) {
+    return <AccessDenied />;
+  }
+  const canCreate = await hasPermission(supabase, site.id, PERMISSIONS.CONTENT_COLUMNS_CREATE);
+
   const [columns, categories] = await Promise.all([
     getColumnsForSite(supabase, site.id, { q: params.q, status: params.status, categoryId: params.category }),
     getCategoriesForSite(supabase, site.id),
@@ -30,13 +39,15 @@ export default async function ColumnsPage({
           <h1 className="text-2xl font-semibold text-[var(--foreground)]">Columns</h1>
           <p className="text-sm text-[var(--muted)]">{site.name}</p>
         </div>
-        <Link
-          href={`/content/columns/new${query}`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" />
-          New column
-        </Link>
+        {canCreate && (
+          <Link
+            href={`/content/columns/new${query}`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            New column
+          </Link>
+        )}
       </div>
 
       <ColumnsFilterBar categories={categories} />

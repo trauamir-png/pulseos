@@ -7,6 +7,9 @@ import { getColumnById } from "@/lib/dashboard/content-columns";
 import { getAuthorById } from "@/lib/dashboard/content-authors";
 import { getCategoryById } from "@/lib/dashboard/content-categories";
 import { StatusBadge } from "@/components/content/status-badge";
+import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
 /**
  * Internal-only preview: renders a Column exactly as it will look publicly,
@@ -24,9 +27,13 @@ export default async function ColumnPreviewPage({
   const { id } = await params;
   const searchParamsResolved = await searchParams;
   const { site } = await resolveDashboardContext(searchParamsResolved);
+  if (!site) return <NoSiteAccess />;
   requireModule(site, "content_management");
 
   const supabase = await createClient();
+  if (!(await hasPermission(supabase, site.id, PERMISSIONS.CONTENT_COLUMNS_VIEW))) {
+    return <AccessDenied />;
+  }
   const column = await getColumnById(supabase, site.id, id);
   const query = dashboardQueryString({ siteId: site.id, range: searchParamsResolved.range, from: searchParamsResolved.from, to: searchParamsResolved.to });
 

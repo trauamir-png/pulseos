@@ -39,6 +39,7 @@ export interface ColumnDetail {
   metaDescription: string | null;
   ogImageId: string | null;
   ogImageUrl: string | null;
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,9 +115,22 @@ function toColumnDetail(row: ColumnRow, featuredImageUrl: string | null, ogImage
     metaDescription: row.meta_description,
     ogImageId: row.og_image_id,
     ogImageUrl,
+    createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+export interface ColumnOwnership {
+  status: ColumnStatus;
+  createdBy: string | null;
+}
+
+/** Lightweight fetch for Server Action authorization checks -- avoids resolving image URLs just to check ownership/status. */
+export async function getColumnOwnership(supabase: Supa, siteId: string, id: string): Promise<ColumnOwnership | null> {
+  const { data: row } = await supabase.from("columns").select("status, created_by").eq("id", id).eq("site_id", siteId).maybeSingle();
+  if (!row) return null;
+  return { status: row.status, createdBy: row.created_by };
 }
 
 /** Every Content table carries site_id directly, so isolation is a single dual-filtered query -- no two-step lookup needed. */

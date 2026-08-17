@@ -3,23 +3,11 @@ import { eachDayOfInterval, eachHourOfInterval } from "date-fns";
 import { toZonedTime, fromZonedTime, format } from "date-fns-tz";
 import type { Database } from "@/lib/supabase/types";
 import { getEpisodesForSite, type EpisodeMeta } from "@/lib/dashboard/podcast";
+import { LISTEN_START_EVENT, PROGRESS_MILESTONES, OUTBOUND_CLICK_EVENTS } from "@/lib/analytics/podcast-events";
 
 type Supa = SupabaseClient<Database>;
 
-/** Real, measured listen progress. `podcast_play` marks a listen start; the rest mark milestones within it. */
-export const LISTEN_START_EVENT = "podcast_play";
-export const PROGRESS_MILESTONES: Record<string, number> = {
-  podcast_progress_25: 25,
-  podcast_progress_50: 50,
-  podcast_progress_75: 75,
-  podcast_complete: 100,
-};
-/** Outbound platform clicks -- never counted as a listen. */
-export const OUTBOUND_CLICK_EVENTS: Record<string, string> = {
-  spotify_click: "Spotify",
-  apple_podcasts_click: "Apple Podcasts",
-  youtube_click: "YouTube",
-};
+export { LISTEN_START_EVENT, PROGRESS_MILESTONES, OUTBOUND_CLICK_EVENTS };
 
 export const PODCAST_ONLINE_THRESHOLD_MS = 90_000;
 

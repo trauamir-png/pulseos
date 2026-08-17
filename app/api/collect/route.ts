@@ -7,6 +7,7 @@ import { classifyTrafficSource } from "@/lib/analytics/traffic-source";
 import { parseUserAgent } from "@/lib/analytics/user-agent";
 import { sanitizePathname, sanitizeQueryParams, extractDomain } from "@/lib/analytics/sanitize";
 import { isRateLimited } from "@/lib/analytics/rate-limit";
+import { PODCAST_EVENT_NAMES } from "@/lib/analytics/podcast-events";
 
 export const runtime = "nodejs";
 
@@ -212,6 +213,48 @@ export async function POST(request: NextRequest) {
       utm_term: params.utm_term ?? null,
       traffic_source: session.traffic_source,
       is_landing: isNewSession,
+      occurred_at: now.toISOString(),
+    });
+  } else if (body.type === "event" && PODCAST_EVENT_NAMES.has(body.eventName)) {
+    const podcastId = body.properties?.podcastId;
+    if (typeof podcastId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(podcastId)) {
+      return NextResponse.json({ error: "invalid_podcast_event" }, { status: 400, headers });
+    }
+
+    const { data: podcast } = await supabase
+      .from("podcasts")
+      .select("id")
+      .eq("id", podcastId)
+      .eq("site_id", site.id)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (!podcast) {
+      return NextResponse.json({ error: "unknown_podcast" }, { status: 403, headers });
+    }
+
+    let episodeId: string | null = null;
+    const episodeGuid = body.properties?.episodeGuid;
+    if (typeof episodeGuid === "string" && episodeGuid) {
+      const { data: episode } = await supabase
+        .from("episodes")
+        .select("id")
+        .eq("podcast_id", podcast.id)
+        .eq("rss_guid", episodeGuid)
+        .eq("active", true)
+        .maybeSingle();
+      episodeId = episode?.id ?? null;
+    }
+
+    await supabase.from("podcast_events").insert({
+      site_id: site.id,
+      podcast_id: podcast.id,
+      episode_id: episodeId,
+      session_id: session.id,
+      visitor_hash: visitorHash,
+      event_name: body.eventName,
+      properties: {},
+      traffic_source: session.traffic_source,
       occurred_at: now.toISOString(),
     });
   } else if (body.type === "event") {

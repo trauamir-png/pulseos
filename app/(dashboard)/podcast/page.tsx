@@ -179,8 +179,9 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
         ))}
         {nonPodbeanPodcasts.map((podcast) => (
           <p key={podcast.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 text-xs text-[var(--muted)]">
-            Hosting analytics are not connected for {podcast.name}. Episode information is synced from its RSS feed; listening metrics measured
-            by PulseOS are shown below and on each episode&apos;s detail page.
+            Spotify/Apple hosting analytics are not connected for {podcast.name}. Episode information is synced from its RSS feed; the listening
+            metrics below and on each episode&apos;s detail page are measured only through the PulseOS website/web player, not hosting-platform
+            plays.
           </p>
         ))}
       </div>
@@ -188,7 +189,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
       <div>
         <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Website Listening (PulseOS Web Player)</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <KpiCard label="Total Listens" value={summary.totalListens.toLocaleString()} />
+          <KpiCard label="Website Listens" value={summary.totalListens.toLocaleString()} />
           <KpiCard label="Unique Listeners" value={summary.uniqueListeners.toLocaleString()} />
           <KpiCard label="Avg Listening Time" value={formatSeconds(summary.avgListeningSeconds)} />
           <KpiCard label="Completion Rate" value={summary.completionRate.toFixed(1)} suffix="%" />

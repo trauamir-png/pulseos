@@ -159,8 +159,8 @@ export default async function EpisodeDetailPage({
         </div>
       ) : (
         <p className="text-xs text-[var(--muted)]">
-          Hosting analytics are not connected for this podcast. Episode metadata is synced from its RSS feed; listening metrics measured by
-          PulseOS are shown below.
+          Spotify/Apple hosting analytics are not connected for this podcast. Episode metadata is synced from its RSS feed; the listening
+          metrics below are measured only through the PulseOS website/web player, not hosting-platform plays.
         </p>
       )}
 

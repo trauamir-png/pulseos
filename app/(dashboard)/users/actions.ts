@@ -119,9 +119,21 @@ export async function createOrInviteUser(input: {
     tempPassword = candidatePassword;
   }
 
-  const { error: profileError } = await admin
-    .from("profiles")
-    .upsert({ id: userId, display_name: displayName, active: true }, { onConflict: "id" });
+  // must_change_password is only ever set true here, for a genuinely new Auth
+  // user still on the generated temp password. When reusedExistingAccount is
+  // true, the field is omitted entirely -- upsert's ON CONFLICT DO UPDATE
+  // only touches columns present in the payload, so an already-onboarded
+  // user being assigned to another site keeps their existing flag untouched.
+  const profilePayload: { id: string; display_name: string; active: boolean; must_change_password?: boolean } = {
+    id: userId,
+    display_name: displayName,
+    active: true,
+  };
+  if (!reusedExistingAccount) {
+    profilePayload.must_change_password = true;
+  }
+
+  const { error: profileError } = await admin.from("profiles").upsert(profilePayload, { onConflict: "id" });
   if (profileError) {
     throw new Error(`User account ready, but saving the profile failed: ${profileError.message}. Re-submitting this form is safe and will resume.`);
   }

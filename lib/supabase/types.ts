@@ -581,6 +581,7 @@ export interface Database {
           display_name: string;
           active: boolean;
           is_admin: boolean;
+          must_change_password: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -589,6 +590,7 @@ export interface Database {
           display_name: string;
           active?: boolean;
           is_admin?: boolean;
+          must_change_password?: boolean;
           created_at?: string;
           updated_at?: string;
         };

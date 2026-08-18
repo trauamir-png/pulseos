@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PERMISSIONS, ROLE_PRESETS, type PermissionKey } from "@/lib/auth/permission-definitions";
-import { WEB_ANALYTICS_ITEMS, PODCAST_ANALYTICS_ITEMS, CONTENT_ITEMS, GLOBAL_ITEMS, canSeeNavItem } from "@/components/sidebar";
+import { WEB_ANALYTICS_ITEMS, PODCAST_ANALYTICS_ITEMS, CONTENT_ITEMS, USERS_ITEMS, GLOBAL_ITEMS, canSeeNavItem } from "@/components/sidebar";
 
 /**
  * Phase 2 spec Section 14 "Sidebar" requirement: simulate permission sets and
@@ -32,26 +32,30 @@ describe("sidebar nav item -> permission mapping", () => {
 
     // Sites/Settings are Admin-only, not permission-gated -- no `permission` field at all.
     expect(GLOBAL_ITEMS.map((i) => i.href)).toEqual(["/sites", "/settings"]);
+
+    // Users & Permissions (Phase 3) is permission-gated like a normal item, not Admin-only like Sites/Settings.
+    expect(byHref(USERS_ITEMS, "/users")).toBe(PERMISSIONS.SITE_USERS_MANAGE);
   });
 
-  it("does not include Writers Chat or Users & Permissions -- neither exists in the sidebar yet", () => {
-    const allHrefs = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...GLOBAL_ITEMS].map((i) => i.href);
+  it("does not include Writers Chat -- it doesn't exist in the sidebar yet", () => {
+    const allHrefs = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...USERS_ITEMS, ...GLOBAL_ITEMS].map(
+      (i) => i.href,
+    );
     expect(allHrefs.some((h) => h.includes("chat"))).toBe(false);
-    expect(allHrefs.some((h) => h.includes("users"))).toBe(false);
   });
 });
 
 describe("canSeeNavItem", () => {
   it("Admin sees every item regardless of granted permissions", () => {
     const noPermissions = new Set<PermissionKey>();
-    for (const item of [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS]) {
+    for (const item of [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...USERS_ITEMS]) {
       expect(canSeeNavItem(true, noPermissions, item)).toBe(true);
     }
   });
 
   it("a non-Admin with zero permissions sees nothing", () => {
     const noPermissions = new Set<PermissionKey>();
-    for (const item of [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS]) {
+    for (const item of [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...USERS_ITEMS]) {
       expect(canSeeNavItem(false, noPermissions, item)).toBe(false);
     }
   });
@@ -78,6 +82,12 @@ describe("canSeeNavItem", () => {
 
     // Sites/Settings are gated on isAdmin directly in the Sidebar component,
     // never on a permission -- a Writer (isAdmin = false) never sees them.
+    expect(USERS_ITEMS.filter((item) => canSeeNavItem(false, writerPermissions, item))).toEqual([]);
+  });
+
+  it("a site-scoped manager holding site.users.manage sees Users & Permissions without being Admin", () => {
+    const managerPermissions = new Set<PermissionKey>([PERMISSIONS.SITE_USERS_MANAGE]);
+    expect(canSeeNavItem(false, managerPermissions, USERS_ITEMS[0])).toBe(true);
   });
 
   it("a permission granted for one module does not leak visibility into another module's items", () => {

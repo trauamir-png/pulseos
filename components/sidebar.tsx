@@ -17,6 +17,7 @@ import {
   Users,
   Tag,
   GalleryHorizontal,
+  UserCog,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
@@ -43,6 +44,11 @@ export const CONTENT_ITEMS = [
   { href: "/content/categories", label: "Categories", icon: Tag, permission: PERMISSIONS.CONTENT_CATEGORIES_MANAGE },
 ];
 
+/** Visible to Admin, or to a non-Admin holding site.users.manage on the currently selected site (Phase 3, Section 1). */
+export const USERS_ITEMS = [
+  { href: "/users", label: "Users & Permissions", icon: UserCog, permission: PERMISSIONS.SITE_USERS_MANAGE },
+];
+
 /** Admin-only, not permission-gated: see the Phase 2 report for why (be conservative -- no site-scoped equivalent exists yet for these two). */
 export const GLOBAL_ITEMS = [
   { href: "/sites", label: "Sites", icon: Globe },
@@ -54,7 +60,7 @@ export function canSeeNavItem(isAdmin: boolean, permissions: ReadonlySet<Permiss
   return isAdmin || permissions.has(item.permission);
 }
 
-const ALL_NAV_ITEMS = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...GLOBAL_ITEMS];
+const ALL_NAV_ITEMS = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...USERS_ITEMS, ...GLOBAL_ITEMS];
 
 /**
  * Nested routes (e.g. /podcast/episodes/[id]) must keep their section's own
@@ -98,6 +104,7 @@ export function Sidebar({
   const visibleWebAnalytics = WEB_ANALYTICS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
   const visiblePodcastAnalytics = PODCAST_ANALYTICS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
   const visibleContent = CONTENT_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
+  const visibleUsers = USERS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
 
   const activeHref = activeHrefFor(pathname);
 
@@ -146,6 +153,10 @@ export function Sidebar({
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Content</p>
             {visibleContent.map(({ href, label, icon }) => renderLink(href, label, icon))}
           </div>
+        )}
+
+        {visibleUsers.length > 0 && (
+          <div className="space-y-0.5">{visibleUsers.map(({ href, label, icon }) => renderLink(href, label, icon))}</div>
         )}
 
         {isAdmin && (

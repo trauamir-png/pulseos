@@ -6,6 +6,7 @@ import { requireModule } from "@/lib/dashboard/modules";
 import { getColumnById } from "@/lib/dashboard/content-columns";
 import { getAuthorById } from "@/lib/dashboard/content-authors";
 import { getCategoryById } from "@/lib/dashboard/content-categories";
+import { formatDate } from "@/lib/format/datetime";
 import { StatusBadge } from "@/components/content/status-badge";
 import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -84,7 +85,7 @@ export default async function ColumnPreviewPage({
         )}
         <p className="mt-3 text-sm text-[var(--muted)]">
           {author?.name ?? "Unknown author"}
-          {column.publishedAt && ` · ${new Date(column.publishedAt).toLocaleDateString()}`}
+          {column.publishedAt && ` · ${formatDate(column.publishedAt, site.timezone)}`}
         </p>
         <div className="column-body mt-6" dangerouslySetInnerHTML={{ __html: column.body }} />
       </div>

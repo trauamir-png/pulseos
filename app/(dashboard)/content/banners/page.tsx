@@ -39,7 +39,7 @@ export default async function BannersPage({ searchParams }: { searchParams: Prom
         </Link>
       </div>
 
-      <BannersTable banners={banners} query={query} />
+      <BannersTable banners={banners} query={query} timeZone={site.timezone} />
     </div>
   );
 }

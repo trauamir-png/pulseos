@@ -51,7 +51,7 @@ export default async function ColumnsPage({
       </div>
 
       <ColumnsFilterBar categories={categories} />
-      <ColumnsTable columns={columns} query={query} />
+      <ColumnsTable columns={columns} query={query} timeZone={site.timezone} />
     </div>
   );
 }

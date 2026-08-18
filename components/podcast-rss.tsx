@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, Rss } from "lucide-react";
 import { connectPodcast, syncPodcastRss, updatePodcastSettings } from "@/app/(dashboard)/podcast/actions";
 import { HOSTING_PROVIDER_OPTIONS, detectHostingProvider, hostingProviderLabel } from "@/lib/rss/hosting-provider";
+import { formatDateTime } from "@/lib/format/datetime";
 import type { PodcastRecord } from "@/lib/dashboard/podcast";
 
 function HostingProviderSelect({
@@ -131,12 +132,16 @@ export function ConnectPodcastForm({ siteId }: { siteId: string }) {
   );
 }
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "Never";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
-export function PodcastRssStatusCard({ podcast, episodeCount }: { podcast: PodcastRecord; episodeCount: number }) {
+export function PodcastRssStatusCard({
+  podcast,
+  episodeCount,
+  timeZone,
+}: {
+  podcast: PodcastRecord;
+  episodeCount: number;
+  /** Site's configured timezone, so "Last synced" renders identically on server and client. Falls back to UTC. */
+  timeZone?: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ added: number; updated: number; unchanged: number } | null>(null);
@@ -211,7 +216,7 @@ export function PodcastRssStatusCard({ podcast, episodeCount }: { podcast: Podca
                 RSS connected
               </span>
               <span>{episodeCount} episodes</span>
-              <span>Last synced: {formatDateTime(podcast.rssLastSyncedAt)}</span>
+              <span>Last synced: {formatDateTime(podcast.rssLastSyncedAt, timeZone)}</span>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { AccessDenied } from "@/components/access-denied";
 import { ProfilePanel, SiteMembershipCard, AddSiteForm } from "@/components/users/edit-user-ui";
 import { getActorContext, getUserDetail, listManageableSites, UsersAccessError } from "@/lib/dashboard/users";
+import { formatDate } from "@/lib/format/datetime";
 
 export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,7 +31,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
       <div>
         <h1 className="text-2xl font-semibold text-[var(--foreground)]">{user.displayName}</h1>
         <p className="text-sm text-[var(--muted)]">
-          {user.email} · Joined {new Date(user.createdAt).toLocaleDateString()}
+          {user.email} · Joined {formatDate(user.createdAt)}
         </p>
       </div>
 

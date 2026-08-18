@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { UserListItem } from "@/lib/dashboard/users";
+import { formatDate } from "@/lib/format/datetime";
 
 export function UsersList({ users }: { users: UserListItem[] }) {
   if (users.length === 0) {
@@ -60,7 +61,7 @@ export function UsersList({ users }: { users: UserListItem[] }) {
                   ))}
                 </div>
               </td>
-              <td className="px-4 py-3 text-[var(--muted)]">{new Date(user.createdAt).toLocaleDateString()}</td>
+              <td className="px-4 py-3 text-[var(--muted)]">{formatDate(user.createdAt)}</td>
               <td className="px-4 py-3 text-right">
                 <Link href={`/users/${user.id}`} className="text-sm font-medium text-[var(--accent)] hover:underline">
                   Manage

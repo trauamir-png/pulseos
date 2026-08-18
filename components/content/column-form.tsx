@@ -11,6 +11,7 @@ import type { ColumnDetail } from "@/lib/dashboard/content-columns";
 import type { AuthorRecord } from "@/lib/dashboard/content-authors";
 import type { CategoryRecord } from "@/lib/dashboard/content-categories";
 import type { MediaAssetRecord } from "@/lib/dashboard/content-media";
+import { formatDateTime } from "@/lib/format/datetime";
 
 export function ColumnForm({
   siteId,
@@ -19,6 +20,7 @@ export function ColumnForm({
   authors,
   categories,
   media,
+  timeZone,
   canPublish = false,
   canSchedule = false,
   canDelete = false,
@@ -29,6 +31,8 @@ export function ColumnForm({
   authors: AuthorRecord[];
   categories: CategoryRecord[];
   media: MediaAssetRecord[];
+  /** Site's configured timezone, so the scheduled-until time renders identically on server and client. Falls back to UTC. */
+  timeZone?: string;
   /** Controls the Publish/Unpublish, Schedule/Cancel-schedule, and Delete controls below --
    * mirrors the Server Action's own enforcement in content/actions.ts, so a user who can only
    * create/edit drafts never sees a control the action would reject anyway (Phase 2, Section 6). */
@@ -189,7 +193,7 @@ export function ColumnForm({
             <div className="flex items-center justify-between">
               <StatusBadge status={column.status} />
               {column.status === "scheduled" && column.scheduledAt && (
-                <span className="text-xs text-[var(--muted)]">until {new Date(column.scheduledAt).toLocaleString()}</span>
+                <span className="text-xs text-[var(--muted)]">until {formatDateTime(column.scheduledAt, timeZone)}</span>
               )}
             </div>
           )}

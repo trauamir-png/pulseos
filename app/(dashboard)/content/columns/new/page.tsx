@@ -33,7 +33,7 @@ export default async function NewColumnPage({ searchParams }: { searchParams: Pr
         <h1 className="text-2xl font-semibold text-[var(--foreground)]">New column</h1>
         <p className="text-sm text-[var(--muted)]">{site.name}</p>
       </div>
-      <ColumnForm siteId={site.id} query={query} column={null} authors={authors} categories={categories} media={media} />
+      <ColumnForm siteId={site.id} query={query} column={null} authors={authors} categories={categories} media={media} timeZone={site.timezone} />
     </div>
   );
 }

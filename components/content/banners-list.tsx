@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { BannerRecord } from "@/lib/dashboard/content-banners";
+import { formatDate } from "@/lib/format/datetime";
 
 const PLACEMENT_LABELS: Record<string, string> = {
   home_hero: "Home — Hero",
@@ -10,7 +11,16 @@ const PLACEMENT_LABELS: Record<string, string> = {
   column_bottom: "Column page — Bottom",
 };
 
-export function BannersTable({ banners, query }: { banners: BannerRecord[]; query: string }) {
+export function BannersTable({
+  banners,
+  query,
+  timeZone,
+}: {
+  banners: BannerRecord[];
+  query: string;
+  /** Site's configured timezone, so the start/end window renders identically on server and client. Falls back to UTC. */
+  timeZone?: string;
+}) {
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       <table className="w-full text-sm">
@@ -53,7 +63,7 @@ export function BannersTable({ banners, query }: { banners: BannerRecord[]; quer
                 </td>
                 <td className="px-4 py-3 text-[var(--muted)]">
                   {banner.startAt || banner.endAt
-                    ? `${banner.startAt ? new Date(banner.startAt).toLocaleDateString() : "…"} – ${banner.endAt ? new Date(banner.endAt).toLocaleDateString() : "…"}`
+                    ? `${banner.startAt ? formatDate(banner.startAt, timeZone) : "…"} – ${banner.endAt ? formatDate(banner.endAt, timeZone) : "…"}`
                     : "Always"}
                 </td>
               </tr>

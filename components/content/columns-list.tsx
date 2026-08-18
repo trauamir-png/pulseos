@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 import { StatusBadge } from "@/components/content/status-badge";
 import type { ColumnListItem } from "@/lib/dashboard/content-columns";
 import type { CategoryRecord } from "@/lib/dashboard/content-categories";
+import { formatDate } from "@/lib/format/datetime";
 
 export function ColumnsFilterBar({ categories }: { categories: CategoryRecord[] }) {
   const router = useRouter();
@@ -56,7 +57,16 @@ export function ColumnsFilterBar({ categories }: { categories: CategoryRecord[] 
   );
 }
 
-export function ColumnsTable({ columns, query }: { columns: ColumnListItem[]; query: string }) {
+export function ColumnsTable({
+  columns,
+  query,
+  timeZone,
+}: {
+  columns: ColumnListItem[];
+  query: string;
+  /** Site's configured timezone, so the Updated date renders identically on server and client. Falls back to UTC. */
+  timeZone?: string;
+}) {
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       <table className="w-full text-sm">
@@ -89,7 +99,7 @@ export function ColumnsTable({ columns, query }: { columns: ColumnListItem[]; qu
                 </td>
                 <td className="px-4 py-3 text-[var(--foreground)]">{col.authorName ?? "–"}</td>
                 <td className="px-4 py-3 text-[var(--foreground)]">{col.categoryName ?? "–"}</td>
-                <td className="px-4 py-3 text-[var(--muted)]">{new Date(col.updatedAt).toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{formatDate(col.updatedAt, timeZone)}</td>
               </tr>
             ))
           )}

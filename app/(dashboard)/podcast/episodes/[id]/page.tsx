@@ -6,6 +6,7 @@ import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodeById, getPodcastsForSite } from "@/lib/dashboard/podcast";
 import { getEpisodeDetail } from "@/lib/dashboard/podcast-queries";
 import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisode } from "@/lib/dashboard/podbean-queries";
+import { formatDate } from "@/lib/format/datetime";
 import { KpiCard } from "@/components/kpi-card";
 import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -146,10 +147,10 @@ export default async function EpisodeDetailPage({
               <p className="text-xs text-[var(--muted)]">
                 Avg consumption time: {formatSeconds(podbeanMetrics.avgConsumptionTimeSeconds)}
                 {podbeanMetrics.engagementStatDate
-                  ? ` · listener/engagement figures as of ${new Date(`${podbeanMetrics.engagementStatDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                  ? ` · listener/engagement figures as of ${formatDate(`${podbeanMetrics.engagementStatDate}T00:00:00Z`)}`
                   : ""}
                 {finalizedThrough
-                  ? ` · downloads finalized through ${new Date(`${finalizedThrough}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
+                  ? ` · downloads finalized through ${formatDate(`${finalizedThrough}T00:00:00Z`)}`
                   : ""}
               </p>
             </>

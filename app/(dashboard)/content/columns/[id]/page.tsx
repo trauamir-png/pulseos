@@ -74,6 +74,7 @@ export default async function EditColumnPage({
         authors={authors}
         categories={categories}
         media={media}
+        timeZone={site.timezone}
         canPublish={canPublish}
         canSchedule={canSchedule}
         canDelete={canDelete}

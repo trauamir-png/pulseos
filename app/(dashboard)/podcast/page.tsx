@@ -150,7 +150,12 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
 
       <div className="space-y-4">
         {podcasts.map((podcast) => (
-          <PodcastRssStatusCard key={podcast.id} podcast={podcast} episodeCount={episodeCountByPodcast.get(podcast.id) ?? 0} />
+          <PodcastRssStatusCard
+            key={podcast.id}
+            podcast={podcast}
+            episodeCount={episodeCountByPodcast.get(podcast.id) ?? 0}
+            timeZone={site.timezone}
+          />
         ))}
       </div>
 
@@ -163,6 +168,7 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
             lastSyncedAt={s.lastSyncedAt}
             lastSyncStatus={s.lastSyncStatus}
             lastError={s.lastError}
+            timeZone={site.timezone}
             downloadsSummary={s.downloadsSummary}
             downloadsTimeseries={s.downloadsTimeseries}
             monthlyDownloadsHistory={s.monthlyDownloadsHistory}

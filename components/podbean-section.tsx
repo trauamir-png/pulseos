@@ -1,3 +1,4 @@
+import { formatDateTime, formatShortDate, formatMonthYear, DEFAULT_TIMEZONE } from "@/lib/format/datetime";
 import type {
   PodbeanDownloadPoint,
   PodbeanDownloadsSummary,
@@ -21,11 +22,11 @@ function formatPercent(rate: number | null): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  return formatShortDate(`${dateStr}T00:00:00Z`, DEFAULT_TIMEZONE);
 }
 
 function formatMonth(dateStr: string): string {
-  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" });
+  return formatMonthYear(`${dateStr}T00:00:00Z`, DEFAULT_TIMEZONE);
 }
 
 function DimensionTable({ title, rows }: { title: string; rows: PodbeanDimensionRow[] }) {
@@ -54,6 +55,8 @@ export interface PodbeanSectionProps {
   lastSyncedAt: string | null;
   lastSyncStatus: string | null;
   lastError: string | null;
+  /** Site's configured timezone, so "Last synced" renders identically on server and client. Falls back to UTC. */
+  timeZone?: string;
   downloadsSummary: PodbeanDownloadsSummary;
   downloadsTimeseries: PodbeanDownloadPoint[];
   monthlyDownloadsHistory: PodbeanMonthlyDownloadPoint[];
@@ -75,6 +78,7 @@ export function PodbeanSection(props: PodbeanSectionProps) {
     lastSyncedAt,
     lastSyncStatus,
     lastError,
+    timeZone,
     downloadsSummary,
     downloadsTimeseries,
     monthlyDownloadsHistory,
@@ -103,7 +107,7 @@ export function PodbeanSection(props: PodbeanSectionProps) {
             {lastSyncStatus === "error" ? (
               <span className="text-[var(--negative)]">Last sync failed{lastError ? `: ${lastError}` : ""}</span>
             ) : lastSyncedAt ? (
-              `Last synced: ${new Date(lastSyncedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+              `Last synced: ${formatDateTime(lastSyncedAt, timeZone)}`
             ) : (
               "Not synced yet"
             )}

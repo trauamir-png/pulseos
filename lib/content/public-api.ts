@@ -5,6 +5,7 @@ import type { Database } from "@/lib/supabase/types";
 type Supa = SupabaseClient<Database>;
 type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
 type StandMediaRow = Database["public"]["Tables"]["stand_media"]["Row"];
+type ChatMessagePublicRow = Database["public"]["Tables"]["chat_messages_public"]["Row"];
 
 const EXCERPT_MAX_LENGTH = 200;
 const WORDS_PER_MINUTE = 200;
@@ -165,5 +166,27 @@ export function serializePublicStandMedia(rows: StandMediaRow[]): PublicStandMed
     tiktokUrl: row.tiktok_url,
     sortOrder: row.sort_order,
     publishedAt: row.published_at,
+  }));
+}
+
+export interface PublicChatMessage {
+  id: string;
+  displayName: string;
+  body: string;
+  createdAt: string;
+}
+
+/**
+ * chat_messages_public already contains only the fields safe to publish
+ * (see supabase/migrations/0016_chat_messages.sql) -- this is a straight
+ * field mapping, same as stand media, never anything from chat_messages
+ * itself (which this API never queries).
+ */
+export function serializePublicChatMessages(rows: ChatMessagePublicRow[]): PublicChatMessage[] {
+  return rows.map((row) => ({
+    id: row.id,
+    displayName: row.display_name,
+    body: row.body,
+    createdAt: row.created_at,
   }));
 }

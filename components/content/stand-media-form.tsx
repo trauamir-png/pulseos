@@ -125,6 +125,14 @@ export function StandMediaForm({
             </button>
           )}
 
+          {item && (
+            <p className="text-xs text-[var(--muted)]">
+              {item.status === "published"
+                ? "Save updates the content and keeps this Published. Unpublish moves it back to Draft."
+                : "Save updates this Draft without publishing it. Publish makes it public."}
+            </p>
+          )}
+
           <div className="flex items-center justify-between border-t border-[var(--border)] pt-3">
             {item && (
               <span

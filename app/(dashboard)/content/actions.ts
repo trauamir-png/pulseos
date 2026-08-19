@@ -12,6 +12,7 @@ import type { BannerPlacement } from "@/lib/dashboard/content-banners";
 import type { Database } from "@/lib/supabase/types";
 import { requireSiteAccess, requirePermission, getCurrentUser, hasPermission } from "@/lib/auth/permissions";
 import { PERMISSIONS } from "@/lib/auth/permission-definitions";
+import { revalidateWebsite } from "@/lib/content/revalidate-website";
 
 const CONTENT_PATHS = ["/content/columns", "/content/authors", "/content/categories", "/content/media", "/content/banners", "/content/stand-media"];
 
@@ -600,6 +601,7 @@ export async function createStandMedia(siteId: string, input: StandMediaInput) {
   if (error) throw new Error(error.message);
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["stand-media"]);
   return { id: data.id };
 }
 
@@ -610,6 +612,8 @@ export async function updateStandMedia(siteId: string, id: string, input: StandM
   await requireSiteAccess(supabase, siteId);
   await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE);
 
+  // Content-only update -- status/published_at are deliberately untouched so
+  // saving a Published item's title keeps it Published on the website.
   const { error } = await supabase
     .from("stand_media")
     .update({
@@ -623,6 +627,7 @@ export async function updateStandMedia(siteId: string, id: string, input: StandM
   if (error) throw new Error(error.message);
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["stand-media"]);
 }
 
 export async function setStandMediaStatus(siteId: string, id: string, status: "draft" | "published") {
@@ -640,6 +645,7 @@ export async function setStandMediaStatus(siteId: string, id: string, status: "d
   if (error) throw new Error(error.message);
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["stand-media"]);
 }
 
 export async function deleteStandMedia(siteId: string, id: string) {
@@ -652,4 +658,5 @@ export async function deleteStandMedia(siteId: string, id: string) {
   if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["stand-media"]);
 }

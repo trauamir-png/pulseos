@@ -315,6 +315,23 @@ describe("content management actions -- permission rejection", () => {
     await expect(actions.createBanner(SITE_A, bannerInput)).resolves.toBeUndefined();
   });
 
+  it("createStandMedia rejects without content.stand_media.manage, allows with it", async () => {
+    const standMediaInput = { title: "מהיציע", tiktokUrl: "https://www.tiktok.com/@team/video/1234567890123456789", sortOrder: 0 };
+
+    currentSupabase = makeSupabase(baseState({ permissions: new Set() }));
+    await expect(actions.createStandMedia(SITE_A, standMediaInput)).rejects.toThrow();
+
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE]) }));
+    await expect(actions.createStandMedia(SITE_A, standMediaInput)).resolves.toEqual({ id: "new-id" });
+  });
+
+  it("createStandMedia rejects a non-TikTok URL even with permission granted", async () => {
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE]) }));
+    await expect(
+      actions.createStandMedia(SITE_A, { title: "מהיציע", tiktokUrl: "https://example.com/video/1", sortOrder: 0 }),
+    ).rejects.toThrow();
+  });
+
   it("uploadMedia rejects without content.media.manage, allows with it", async () => {
     const formData = new FormData();
     formData.set("file", new File(["fake-bytes"], "photo.png", { type: "image/png" }));

@@ -13,7 +13,7 @@ import type { Database } from "@/lib/supabase/types";
 import { requireSiteAccess, requirePermission, getCurrentUser, hasPermission } from "@/lib/auth/permissions";
 import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 
-const CONTENT_PATHS = ["/content/columns", "/content/authors", "/content/categories", "/content/media", "/content/banners"];
+const CONTENT_PATHS = ["/content/columns", "/content/authors", "/content/categories", "/content/media", "/content/banners", "/content/stand-media"];
 
 function revalidateContent() {
   for (const path of CONTENT_PATHS) revalidatePath(path);
@@ -548,6 +548,106 @@ export async function deleteBanner(siteId: string, id: string) {
   await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_BANNERS_MANAGE);
 
   const { data, error } = await supabase.from("banners").delete().eq("id", id).eq("site_id", siteId).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
+
+  revalidateContent();
+}
+
+// ---------------------------------------------------------------------------
+// Stand Media ("מדיה מהיציע")
+// ---------------------------------------------------------------------------
+
+export interface StandMediaInput {
+  title: string;
+  tiktokUrl: string;
+  sortOrder: number;
+}
+
+function validateStandMediaInput(input: StandMediaInput) {
+  if (!input.title.trim()) throw new Error("Title is required.");
+  const url = input.tiktokUrl.trim();
+  if (!url) throw new Error("A TikTok video URL is required.");
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Enter a valid TikTok video URL.");
+  }
+  if (!/(^|\.)tiktok\.com$/i.test(parsed.hostname)) {
+    throw new Error("That doesn't look like a TikTok URL.");
+  }
+}
+
+export async function createStandMedia(siteId: string, input: StandMediaInput) {
+  validateStandMediaInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE);
+
+  const { data, error } = await supabase
+    .from("stand_media")
+    .insert({
+      site_id: siteId,
+      title: input.title.trim(),
+      tiktok_url: input.tiktokUrl.trim(),
+      sort_order: input.sortOrder,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  return { id: data.id };
+}
+
+export async function updateStandMedia(siteId: string, id: string, input: StandMediaInput) {
+  validateStandMediaInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE);
+
+  const { error } = await supabase
+    .from("stand_media")
+    .update({
+      title: input.title.trim(),
+      tiktok_url: input.tiktokUrl.trim(),
+      sort_order: input.sortOrder,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+}
+
+export async function setStandMediaStatus(siteId: string, id: string, status: "draft" | "published") {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE);
+
+  const patch: Database["public"]["Tables"]["stand_media"]["Update"] = { status, updated_at: new Date().toISOString() };
+  if (status === "published") {
+    const { data: existing } = await supabase.from("stand_media").select("published_at").eq("id", id).eq("site_id", siteId).maybeSingle();
+    patch.published_at = existing?.published_at ?? new Date().toISOString();
+  }
+
+  const { error } = await supabase.from("stand_media").update(patch).eq("id", id).eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+}
+
+export async function deleteStandMedia(siteId: string, id: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE);
+
+  const { data, error } = await supabase.from("stand_media").delete().eq("id", id).eq("site_id", siteId).select("id");
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
 

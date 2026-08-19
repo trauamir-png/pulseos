@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/types";
 
 type Supa = SupabaseClient<Database>;
 type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
+type StandMediaRow = Database["public"]["Tables"]["stand_media"]["Row"];
 
 const EXCERPT_MAX_LENGTH = 200;
 const WORDS_PER_MINUTE = 200;
@@ -146,4 +147,23 @@ export async function serializePublicColumns(supabase: Supa, rows: ColumnRow[]):
       updatedAt: row.updated_at,
     };
   });
+}
+
+export interface PublicStandMedia {
+  id: string;
+  title: string;
+  tiktokUrl: string;
+  sortOrder: number;
+  publishedAt: string | null;
+}
+
+/** No related entities to batch-resolve -- unlike columns, a Stand Media row is already public-shaped, so this is a straight field mapping. */
+export function serializePublicStandMedia(rows: StandMediaRow[]): PublicStandMedia[] {
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    tiktokUrl: row.tiktok_url,
+    sortOrder: row.sort_order,
+    publishedAt: row.published_at,
+  }));
 }

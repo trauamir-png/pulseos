@@ -18,6 +18,7 @@ import {
   Tag,
   GalleryHorizontal,
   UserCog,
+  Video,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
@@ -39,6 +40,7 @@ export const PODCAST_ANALYTICS_ITEMS = [
 export const CONTENT_ITEMS = [
   { href: "/content/columns", label: "Columns", icon: Newspaper, permission: PERMISSIONS.CONTENT_COLUMNS_VIEW },
   { href: "/content/banners", label: "Banners", icon: GalleryHorizontal, permission: PERMISSIONS.CONTENT_BANNERS_MANAGE },
+  { href: "/content/stand-media", label: "Stand Media", icon: Video, permission: PERMISSIONS.CONTENT_STAND_MEDIA_VIEW },
   { href: "/content/media", label: "Media", icon: ImageIcon, permission: PERMISSIONS.CONTENT_MEDIA_MANAGE },
   { href: "/content/authors", label: "Authors", icon: Users, permission: PERMISSIONS.CONTENT_AUTHORS_MANAGE },
   { href: "/content/categories", label: "Categories", icon: Tag, permission: PERMISSIONS.CONTENT_CATEGORIES_MANAGE },

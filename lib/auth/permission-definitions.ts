@@ -28,6 +28,7 @@ export const PERMISSIONS = {
   CONTENT_STAND_MEDIA_VIEW: "content.stand_media.view",
   CONTENT_STAND_MEDIA_MANAGE: "content.stand_media.manage",
   CHAT_WRITERS_ACCESS: "chat.writers.access",
+  CHAT_MESSAGES_DELETE_ANY: "chat.messages.delete_any",
   SITE_USERS_MANAGE: "site.users.manage",
   SITE_SETTINGS_MANAGE: "site.settings.manage",
 } as const;
@@ -65,6 +66,7 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
   { key: PERMISSIONS.CONTENT_STAND_MEDIA_VIEW, category: "Content", label: "View Stand Media" },
   { key: PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE, category: "Content", label: "Manage Stand Media" },
   { key: PERMISSIONS.CHAT_WRITERS_ACCESS, category: "Collaboration", label: "Access Writers Chat" },
+  { key: PERMISSIONS.CHAT_MESSAGES_DELETE_ANY, category: "Collaboration", label: "Delete Any Chat Message" },
   { key: PERMISSIONS.SITE_USERS_MANAGE, category: "Administration", label: "Manage Users & Permissions for this site" },
   { key: PERMISSIONS.SITE_SETTINGS_MANAGE, category: "Administration", label: "Manage Site Settings" },
 ];
@@ -98,6 +100,7 @@ export const ROLE_PRESETS: Record<string, PermissionKey[]> = {
     PERMISSIONS.CONTENT_STAND_MEDIA_VIEW,
     PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE,
     PERMISSIONS.CHAT_WRITERS_ACCESS,
+    PERMISSIONS.CHAT_MESSAGES_DELETE_ANY,
   ],
   writer: [
     PERMISSIONS.CONTENT_COLUMNS_VIEW,

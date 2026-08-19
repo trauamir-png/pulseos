@@ -37,3 +37,32 @@ export async function sendChatMessage(siteId: string, body: string) {
 
   return { id: data.id, display_name: profile.displayName, body: trimmed, created_at: data.created_at };
 }
+
+/**
+ * Authorization is enforced entirely by the chat_messages DELETE RLS policy
+ * (0017_chat_message_delete.sql: own message + chat.writers.access, OR
+ * chat.messages.delete_any, which Admin also satisfies via has_permission's
+ * built-in bypass) -- this action does not re-implement that three-tier
+ * logic in application code, on purpose, so there is exactly one place the
+ * rule can drift. requireSiteAccess below is only a fail-fast/UX check, not
+ * the security boundary.
+ *
+ * A delete blocked by RLS does not error -- Postgres/PostgREST report it as
+ * a successful delete of zero rows. Selecting the deleted id back is what
+ * lets us tell "deleted" apart from "silently denied."
+ */
+export async function deleteChatMessage(siteId: string, messageId: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .delete()
+    .eq("id", messageId)
+    .eq("site_id", siteId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Not authorized to delete this message.");
+
+  revalidatePath("/chat");
+}

@@ -601,6 +601,42 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["stand_media"]["Insert"]>;
         Relationships: [];
       };
+      chat_messages: {
+        Row: {
+          id: string;
+          site_id: string;
+          sender_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          sender_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["chat_messages"]["Insert"]>;
+        Relationships: [];
+      };
+      chat_messages_public: {
+        Row: {
+          id: string;
+          site_id: string;
+          display_name: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          site_id: string;
+          display_name: string;
+          body: string;
+          created_at: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["chat_messages_public"]["Insert"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;

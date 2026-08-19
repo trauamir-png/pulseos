@@ -19,6 +19,7 @@ import {
   GalleryHorizontal,
   UserCog,
   Video,
+  MessageCircle,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
@@ -51,6 +52,11 @@ export const USERS_ITEMS = [
   { href: "/users", label: "Users & Permissions", icon: UserCog, permission: PERMISSIONS.SITE_USERS_MANAGE },
 ];
 
+/** Visible to Admin, or to a non-Admin holding chat.writers.access on the currently selected site. Not module-gated, like USERS_ITEMS. */
+export const CHAT_ITEMS = [
+  { href: "/chat", label: "Chat", icon: MessageCircle, permission: PERMISSIONS.CHAT_WRITERS_ACCESS },
+];
+
 /** Admin-only, not permission-gated: see the Phase 2 report for why (be conservative -- no site-scoped equivalent exists yet for these two). */
 export const GLOBAL_ITEMS = [
   { href: "/sites", label: "Sites", icon: Globe },
@@ -62,7 +68,7 @@ export function canSeeNavItem(isAdmin: boolean, permissions: ReadonlySet<Permiss
   return isAdmin || permissions.has(item.permission);
 }
 
-const ALL_NAV_ITEMS = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...USERS_ITEMS, ...GLOBAL_ITEMS];
+const ALL_NAV_ITEMS = [...WEB_ANALYTICS_ITEMS, ...PODCAST_ANALYTICS_ITEMS, ...CONTENT_ITEMS, ...USERS_ITEMS, ...CHAT_ITEMS, ...GLOBAL_ITEMS];
 
 /**
  * Nested routes (e.g. /podcast/episodes/[id]) must keep their section's own
@@ -107,6 +113,7 @@ export function Sidebar({
   const visiblePodcastAnalytics = PODCAST_ANALYTICS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
   const visibleContent = CONTENT_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
   const visibleUsers = USERS_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
+  const visibleChat = CHAT_ITEMS.filter((item) => canSeeNavItem(isAdmin, permissions, item));
 
   const activeHref = activeHrefFor(pathname);
 
@@ -159,6 +166,10 @@ export function Sidebar({
 
         {visibleUsers.length > 0 && (
           <div className="space-y-0.5">{visibleUsers.map(({ href, label, icon }) => renderLink(href, label, icon))}</div>
+        )}
+
+        {visibleChat.length > 0 && (
+          <div className="space-y-0.5">{visibleChat.map(({ href, label, icon }) => renderLink(href, label, icon))}</div>
         )}
 
         {isAdmin && (

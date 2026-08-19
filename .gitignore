@@ -24,3 +24,8 @@ next-env.d.ts
 # supabase
 supabase/.temp/
 .qa-scratch/
+.vercel
+.env*
+
+# claude code local settings
+.claude/

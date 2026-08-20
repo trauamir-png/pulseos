@@ -97,6 +97,7 @@ export interface UserListItem {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl: string | null;
   active: boolean;
   isAdmin: boolean;
   createdAt: string;
@@ -107,6 +108,7 @@ export interface UserListItem {
 interface ProfileRow {
   id: string;
   display_name: string;
+  avatar_url: string | null;
   active: boolean;
   is_admin: boolean;
   created_at: string;
@@ -177,6 +179,7 @@ export async function listUsersForActor(actor: ActorContext): Promise<UserListIt
     id: p.id,
     email: emails.get(p.id) ?? "(no auth email on file)",
     displayName: p.display_name,
+    avatarUrl: p.avatar_url ?? null,
     active: p.active,
     isAdmin: p.is_admin,
     createdAt: p.created_at,
@@ -202,6 +205,7 @@ export async function getUserDetail(actor: ActorContext, userId: string): Promis
     id: profile.id,
     email: emails.get(profile.id) ?? "(no auth email on file)",
     displayName: profile.display_name,
+    avatarUrl: profile.avatar_url ?? null,
     active: profile.active,
     isAdmin: profile.is_admin,
     createdAt: profile.created_at,

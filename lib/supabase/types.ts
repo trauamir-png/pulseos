@@ -624,6 +624,7 @@ export interface Database {
           id: string;
           site_id: string;
           display_name: string;
+          avatar_url: string | null;
           body: string;
           created_at: string;
         };
@@ -631,6 +632,7 @@ export interface Database {
           id: string;
           site_id: string;
           display_name: string;
+          avatar_url?: string | null;
           body: string;
           created_at: string;
         };
@@ -641,6 +643,7 @@ export interface Database {
         Row: {
           id: string;
           display_name: string;
+          avatar_url: string | null;
           active: boolean;
           is_admin: boolean;
           must_change_password: boolean;
@@ -650,6 +653,7 @@ export interface Database {
         Insert: {
           id: string;
           display_name: string;
+          avatar_url?: string | null;
           active?: boolean;
           is_admin?: boolean;
           must_change_password?: boolean;

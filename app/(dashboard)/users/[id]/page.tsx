@@ -35,7 +35,14 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
         </p>
       </div>
 
-      <ProfilePanel userId={user.id} displayName={user.displayName} active={user.active} isAdmin={user.isAdmin} canEdit={actor.isAdmin} />
+      <ProfilePanel
+        userId={user.id}
+        displayName={user.displayName}
+        avatarUrl={user.avatarUrl}
+        active={user.active}
+        isAdmin={user.isAdmin}
+        canEdit={actor.isAdmin}
+      />
 
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-[var(--foreground)]">Site access</h2>

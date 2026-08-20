@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { RANGE_PRESET_LABELS, type RangePreset } from "@/lib/analytics/date-range";
 import type { SiteRecord } from "@/lib/dashboard/site";
@@ -87,6 +88,14 @@ export function Topbar({ sites }: { sites: SiteRecord[] }) {
             </button>
           ))}
         </div>
+
+        <Link
+          href="/account"
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
+        >
+          <User size={14} />
+          My profile
+        </Link>
 
         <button
           onClick={handleLogout}

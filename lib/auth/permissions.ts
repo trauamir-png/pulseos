@@ -7,6 +7,7 @@ type Supa = SupabaseClient<Database>;
 export interface Profile {
   id: string;
   displayName: string;
+  avatarUrl: string | null;
   active: boolean;
   isAdmin: boolean;
 }
@@ -39,7 +40,7 @@ export async function getCurrentProfile(supabase: Supa): Promise<Profile | null>
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
   if (!data) return null;
 
-  return { id: data.id, displayName: data.display_name, active: data.active, isAdmin: data.is_admin };
+  return { id: data.id, displayName: data.display_name, avatarUrl: data.avatar_url, active: data.active, isAdmin: data.is_admin };
 }
 
 export async function isAdmin(supabase: Supa): Promise<boolean> {

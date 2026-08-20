@@ -11,19 +11,22 @@ import {
   updateUserDisplayName,
 } from "@/app/(dashboard)/users/actions";
 import { PermissionChecklist } from "./permission-checklist";
+import { AvatarManager } from "@/components/account/avatar-manager";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import type { PermissionKey } from "@/lib/auth/permission-definitions";
 
-/** Admin-only profile fields: display name and the global active/disabled toggle. */
+/** Admin-only profile fields: avatar, display name, and the global active/disabled toggle. */
 export function ProfilePanel({
   userId,
   displayName,
+  avatarUrl,
   active,
   isAdmin,
   canEdit,
 }: {
   userId: string;
   displayName: string;
+  avatarUrl: string | null;
   active: boolean;
   isAdmin: boolean;
   canEdit: boolean;
@@ -62,7 +65,8 @@ export function ProfilePanel({
 
   if (!canEdit) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <AvatarManager userId={userId} displayName={displayName} avatarUrl={avatarUrl} canEdit={false} />
         <p className="text-sm font-medium text-[var(--foreground)]">{displayName}</p>
         <span className={`mt-1 inline-block rounded-full px-2.5 py-1 text-xs font-medium ${active ? "bg-green-50 text-green-700" : "bg-gray-100 text-[var(--muted)]"}`}>
           {active ? "Active" : "Disabled"}
@@ -73,6 +77,8 @@ export function ProfilePanel({
 
   return (
     <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <AvatarManager userId={userId} displayName={displayName} avatarUrl={avatarUrl} canEdit={true} />
+
       <div className="flex items-end gap-2">
         <div className="flex-1">
           <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">Name</label>

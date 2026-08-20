@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   let query = supabase
     .from("chat_messages_public")
-    .select("id, site_id, display_name, body, created_at")
+    .select("id, site_id, display_name, avatar_url, body, created_at")
     .eq("site_id", siteId)
     .order("created_at", { ascending: false })
     .limit(pageSize);

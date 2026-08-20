@@ -172,20 +172,23 @@ export function serializePublicStandMedia(rows: StandMediaRow[]): PublicStandMed
 export interface PublicChatMessage {
   id: string;
   displayName: string;
+  avatarUrl: string | null;
   body: string;
   createdAt: string;
 }
 
 /**
  * chat_messages_public already contains only the fields safe to publish
- * (see supabase/migrations/0016_chat_messages.sql) -- this is a straight
- * field mapping, same as stand media, never anything from chat_messages
- * itself (which this API never queries).
+ * (see supabase/migrations/0016_chat_messages.sql, extended with avatar_url
+ * in 0018_profile_avatars.sql) -- this is a straight field mapping, same as
+ * stand media, never anything from chat_messages itself (which this API
+ * never queries).
  */
 export function serializePublicChatMessages(rows: ChatMessagePublicRow[]): PublicChatMessage[] {
   return rows.map((row) => ({
     id: row.id,
     displayName: row.display_name,
+    avatarUrl: row.avatar_url,
     body: row.body,
     createdAt: row.created_at,
   }));

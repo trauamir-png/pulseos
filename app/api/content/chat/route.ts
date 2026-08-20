@@ -10,7 +10,10 @@ const DEFAULT_PAGE_SIZE = 20;
 const querySchema = z.object({
   site: z.string().min(1),
   limit: z.coerce.number().int().positive().max(50).optional(),
-  before: z.string().datetime().optional(),
+  // Postgres/PostgREST serialize timestamptz with a numeric offset (+00:00),
+  // not a literal "Z" -- the very value this endpoint's own nextCursor hands
+  // back to callers, so the validator must accept that format too.
+  before: z.string().datetime({ offset: true }).optional(),
 });
 
 function corsHeaders() {

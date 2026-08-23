@@ -601,6 +601,42 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["stand_media"]["Insert"]>;
         Relationships: [];
       };
+      match_panel_picks: {
+        Row: {
+          id: string;
+          site_id: string;
+          external_fixture_id: string;
+          match_date: string;
+          opponent_name: string;
+          competition: string | null;
+          is_home: boolean;
+          home_score: number | null;
+          away_score: number | null;
+          is_final: boolean;
+          player_name: string;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          external_fixture_id: string;
+          match_date: string;
+          opponent_name: string;
+          competition?: string | null;
+          is_home: boolean;
+          home_score?: number | null;
+          away_score?: number | null;
+          is_final?: boolean;
+          player_name: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["match_panel_picks"]["Insert"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: {
           id: string;

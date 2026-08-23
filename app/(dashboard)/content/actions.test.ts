@@ -332,6 +332,54 @@ describe("content management actions -- permission rejection", () => {
     ).rejects.toThrow();
   });
 
+  const winPickInput = {
+    externalFixtureId: "fixture-123",
+    matchDate: "2026-08-20",
+    opponentName: "הפועל תל אביב",
+    competition: "ליגת העל",
+    isHome: true,
+    homeScore: 3,
+    awayScore: 1,
+    isFinal: true,
+    playerName: "עומר אתגר",
+  };
+
+  it("createMatchPanelPick rejects without content.match_panel_picks.manage, allows with it", async () => {
+    currentSupabase = makeSupabase(baseState({ permissions: new Set() }));
+    await expect(actions.createMatchPanelPick(SITE_A, winPickInput)).rejects.toThrow();
+
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE]) }));
+    await expect(actions.createMatchPanelPick(SITE_A, winPickInput)).resolves.toEqual({ id: "new-id" });
+  });
+
+  it("createMatchPanelPick is denied for a site the user has no membership on, even with manage granted on their own site", async () => {
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE]) }));
+    await expect(actions.createMatchPanelPick(SITE_B, winPickInput)).rejects.toThrow();
+  });
+
+  it("createMatchPanelPick rejects missing required fields even with permission granted", async () => {
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE]) }));
+    await expect(actions.createMatchPanelPick(SITE_A, { ...winPickInput, playerName: "" })).rejects.toThrow();
+    await expect(actions.createMatchPanelPick(SITE_A, { ...winPickInput, externalFixtureId: "" })).rejects.toThrow();
+    await expect(actions.createMatchPanelPick(SITE_A, { ...winPickInput, opponentName: "" })).rejects.toThrow();
+  });
+
+  it("updateMatchPanelPick (replace) rejects without manage, allows with it", async () => {
+    currentSupabase = makeSupabase(baseState({ permissions: new Set() }));
+    await expect(actions.updateMatchPanelPick(SITE_A, "pick-1", { ...winPickInput, playerName: "שחקן אחר" })).rejects.toThrow();
+
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE]) }));
+    await expect(actions.updateMatchPanelPick(SITE_A, "pick-1", { ...winPickInput, playerName: "שחקן אחר" })).resolves.toBeUndefined();
+  });
+
+  it("deleteMatchPanelPick (remove) rejects without manage, allows with it", async () => {
+    currentSupabase = makeSupabase(baseState({ permissions: new Set() }));
+    await expect(actions.deleteMatchPanelPick(SITE_A, "pick-1")).rejects.toThrow();
+
+    currentSupabase = makeSupabase(baseState({ permissions: new Set([PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE]) }));
+    await expect(actions.deleteMatchPanelPick(SITE_A, "pick-1")).resolves.toBeUndefined();
+  });
+
   it("uploadMedia rejects without content.media.manage, allows with it", async () => {
     const formData = new FormData();
     formData.set("file", new File(["fake-bytes"], "photo.png", { type: "image/png" }));

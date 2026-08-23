@@ -14,7 +14,15 @@ import { requireSiteAccess, requirePermission, getCurrentUser, hasPermission } f
 import { PERMISSIONS } from "@/lib/auth/permission-definitions";
 import { revalidateWebsite } from "@/lib/content/revalidate-website";
 
-const CONTENT_PATHS = ["/content/columns", "/content/authors", "/content/categories", "/content/media", "/content/banners", "/content/stand-media"];
+const CONTENT_PATHS = [
+  "/content/columns",
+  "/content/authors",
+  "/content/categories",
+  "/content/media",
+  "/content/banners",
+  "/content/stand-media",
+  "/content/match-panel-picks",
+];
 
 function revalidateContent() {
   for (const path of CONTENT_PATHS) revalidatePath(path);
@@ -659,4 +667,109 @@ export async function deleteStandMedia(siteId: string, id: string) {
 
   revalidateContent();
   await revalidateWebsite(supabase, siteId, ["stand-media"]);
+}
+
+// ---------------------------------------------------------------------------
+// Match Panel Picks
+// ---------------------------------------------------------------------------
+
+export interface MatchPanelPickInput {
+  externalFixtureId: string;
+  matchDate: string;
+  opponentName: string;
+  competition: string;
+  isHome: boolean;
+  homeScore: number | null;
+  awayScore: number | null;
+  isFinal: boolean;
+  playerName: string;
+}
+
+function validateMatchPanelPickInput(input: MatchPanelPickInput) {
+  if (!input.externalFixtureId.trim()) throw new Error("A fixture id is required.");
+  if (!input.matchDate.trim()) throw new Error("A match date is required.");
+  if (!input.opponentName.trim()) throw new Error("An opponent name is required.");
+  if (!input.playerName.trim()) throw new Error("A player is required.");
+  if (input.homeScore != null && input.homeScore < 0) throw new Error("Home score can't be negative.");
+  if (input.awayScore != null && input.awayScore < 0) throw new Error("Away score can't be negative.");
+}
+
+export async function createMatchPanelPick(siteId: string, input: MatchPanelPickInput) {
+  validateMatchPanelPickInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE);
+  const user = await getCurrentUser(supabase);
+
+  const { data, error } = await supabase
+    .from("match_panel_picks")
+    .insert({
+      site_id: siteId,
+      external_fixture_id: input.externalFixtureId.trim(),
+      match_date: input.matchDate,
+      opponent_name: input.opponentName.trim(),
+      competition: input.competition.trim() || null,
+      is_home: input.isHome,
+      home_score: input.homeScore,
+      away_score: input.awayScore,
+      is_final: input.isFinal,
+      player_name: input.playerName.trim(),
+      created_by: user?.id ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") throw new Error("A panel pick for this fixture id already exists on this site.");
+    throw new Error(error.message);
+  }
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["match-panel-picks"]);
+  return { id: data.id };
+}
+
+export async function updateMatchPanelPick(siteId: string, id: string, input: MatchPanelPickInput) {
+  validateMatchPanelPickInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE);
+
+  const { error } = await supabase
+    .from("match_panel_picks")
+    .update({
+      external_fixture_id: input.externalFixtureId.trim(),
+      match_date: input.matchDate,
+      opponent_name: input.opponentName.trim(),
+      competition: input.competition.trim() || null,
+      is_home: input.isHome,
+      home_score: input.homeScore,
+      away_score: input.awayScore,
+      is_final: input.isFinal,
+      player_name: input.playerName.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("site_id", siteId);
+  if (error) {
+    if (error.code === "23505") throw new Error("A panel pick for this fixture id already exists on this site.");
+    throw new Error(error.message);
+  }
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["match-panel-picks"]);
+}
+
+export async function deleteMatchPanelPick(siteId: string, id: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_MANAGE);
+
+  const { data, error } = await supabase.from("match_panel_picks").delete().eq("id", id).eq("site_id", siteId).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["match-panel-picks"]);
 }

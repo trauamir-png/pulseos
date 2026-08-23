@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/types";
+import { derivePanelPickType, panelPickLabel } from "@/lib/content/match-result";
 
 type Supa = SupabaseClient<Database>;
 type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
 type StandMediaRow = Database["public"]["Tables"]["stand_media"]["Row"];
 type ChatMessagePublicRow = Database["public"]["Tables"]["chat_messages_public"]["Row"];
+type MatchPanelPickRow = Database["public"]["Tables"]["match_panel_picks"]["Row"];
 
 const EXCERPT_MAX_LENGTH = 200;
 const WORDS_PER_MINUTE = 200;
@@ -192,4 +194,41 @@ export function serializePublicChatMessages(rows: ChatMessagePublicRow[]): Publi
     body: row.body,
     createdAt: row.created_at,
   }));
+}
+
+export interface PublicMatchPanelPick {
+  fixtureId: string;
+  matchDate: string;
+  opponentName: string;
+  isHome: boolean;
+  playerName: string;
+  pickType: "best" | "disappointing";
+  label: string;
+}
+
+/**
+ * pickType/label are always derived here from is_home/home_score/away_score/
+ * is_final, never trusted from a stored value -- a row can only reach here at
+ * all via the `anon read final match_panel_picks` RLS policy (is_final = true
+ * and both scores set), but a not-final or unscored row is still filtered out
+ * defensively in case that policy is ever loosened. created_by is
+ * intentionally never selected/mapped -- nothing about who created a pick is
+ * public.
+ */
+export function serializePublicMatchPanelPicks(rows: MatchPanelPickRow[]): PublicMatchPanelPick[] {
+  const result: PublicMatchPanelPick[] = [];
+  for (const row of rows) {
+    const pickType = derivePanelPickType({ isHome: row.is_home, homeScore: row.home_score, awayScore: row.away_score, isFinal: row.is_final });
+    if (!pickType) continue;
+    result.push({
+      fixtureId: row.external_fixture_id,
+      matchDate: row.match_date,
+      opponentName: row.opponent_name,
+      isHome: row.is_home,
+      playerName: row.player_name,
+      pickType,
+      label: panelPickLabel(pickType),
+    });
+  }
+  return result;
 }

@@ -751,12 +751,108 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["membership_permissions"]["Insert"]>;
         Relationships: [];
       };
+      match_fan_polls: {
+        Row: {
+          id: string;
+          site_id: string;
+          external_fixture_id: string;
+          match_date: string;
+          opponent_name: string;
+          competition: string | null;
+          is_home: boolean;
+          home_score: number | null;
+          away_score: number | null;
+          is_final: boolean;
+          status: "draft" | "open" | "closed";
+          opened_at: string | null;
+          closed_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          external_fixture_id: string;
+          match_date: string;
+          opponent_name: string;
+          competition?: string | null;
+          is_home: boolean;
+          home_score?: number | null;
+          away_score?: number | null;
+          is_final?: boolean;
+          status?: "draft" | "open" | "closed";
+          opened_at?: string | null;
+          closed_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["match_fan_polls"]["Insert"]>;
+        Relationships: [];
+      };
+      match_fan_poll_candidates: {
+        Row: {
+          id: string;
+          poll_id: string;
+          player_id: string;
+          slug: string | null;
+          player_name: string;
+          profile_url: string | null;
+          image_url: string | null;
+          shirt_number: number | null;
+          starter: boolean;
+          entered_as_substitute: boolean;
+          entry_minute: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          poll_id: string;
+          player_id: string;
+          slug?: string | null;
+          player_name: string;
+          profile_url?: string | null;
+          image_url?: string | null;
+          shirt_number?: number | null;
+          starter?: boolean;
+          entered_as_substitute?: boolean;
+          entry_minute?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["match_fan_poll_candidates"]["Insert"]>;
+        Relationships: [];
+      };
+      match_fan_votes: {
+        Row: {
+          id: string;
+          poll_id: string;
+          candidate_id: string;
+          voter_hash: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          poll_id: string;
+          candidate_id: string;
+          voter_hash: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["match_fan_votes"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       increment_rate_limit: {
         Args: { p_site_id: string; p_minute_bucket: string };
         Returns: number;
+      };
+      match_fan_poll_results: {
+        Args: { p_poll_id: string };
+        Returns: { candidate_id: string; vote_count: number }[];
       };
       is_admin: {
         Args: { p_user_id?: string };

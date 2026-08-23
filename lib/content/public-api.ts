@@ -8,6 +8,8 @@ type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
 type StandMediaRow = Database["public"]["Tables"]["stand_media"]["Row"];
 type ChatMessagePublicRow = Database["public"]["Tables"]["chat_messages_public"]["Row"];
 type MatchPanelPickRow = Database["public"]["Tables"]["match_panel_picks"]["Row"];
+type MatchFanPollRow = Database["public"]["Tables"]["match_fan_polls"]["Row"];
+type MatchFanPollCandidateRow = Database["public"]["Tables"]["match_fan_poll_candidates"]["Row"];
 
 const EXCERPT_MAX_LENGTH = 200;
 const WORDS_PER_MINUTE = 200;
@@ -231,4 +233,72 @@ export function serializePublicMatchPanelPicks(rows: MatchPanelPickRow[]): Publi
     });
   }
   return result;
+}
+
+export interface PublicFanVotePoll {
+  id: string;
+  fixtureId: string;
+  matchDate: string;
+  opponentName: string;
+  competition: string | null;
+  isHome: boolean;
+  status: "open" | "closed";
+  voteType: "best" | "disappointing";
+  label: string;
+}
+
+/**
+ * A row only reaches here via the `anon read open/closed match_fan_polls`
+ * RLS policy (see supabase/migrations/0020_match_fan_voting.sql), which
+ * already excludes `draft` -- a draft poll's row is simply never returned by
+ * the query this feeds, so it's indistinguishable from a nonexistent poll to
+ * the public API (an intentional, conservative reading of "don't leak an
+ * unopened poll's existence"). vote_type/label are derived, never stored,
+ * same as match_panel_picks. A not-final/unscored row is filtered out
+ * defensively even though status open/closed should imply is_final=true.
+ */
+export function serializePublicFanVotePoll(row: MatchFanPollRow): PublicFanVotePoll | null {
+  if (row.status !== "open" && row.status !== "closed") return null;
+  const voteType = derivePanelPickType({ isHome: row.is_home, homeScore: row.home_score, awayScore: row.away_score, isFinal: row.is_final });
+  if (!voteType) return null;
+  return {
+    id: row.id,
+    fixtureId: row.external_fixture_id,
+    matchDate: row.match_date,
+    opponentName: row.opponent_name,
+    competition: row.competition,
+    isHome: row.is_home,
+    status: row.status,
+    voteType,
+    label: panelPickLabel(voteType),
+  };
+}
+
+export interface PublicFanVoteCandidate {
+  id: string;
+  playerId: string;
+  slug: string | null;
+  playerName: string;
+  profileUrl: string | null;
+  imageUrl: string | null;
+  shirtNumber: number | null;
+  starter: boolean;
+  enteredAsSubstitute: boolean;
+  entryMinute: number | null;
+}
+
+/** `id` here is match_fan_poll_candidates.id -- the value the client must send back as `candidateId` when voting. Nothing about created_by/poll internals is exposed. */
+export function serializePublicFanVoteCandidates(rows: MatchFanPollCandidateRow[]): PublicFanVoteCandidate[] {
+  return rows.map((row) => ({
+    id: row.id,
+    playerId: row.player_id,
+    slug: row.slug,
+    playerName: row.player_name,
+    profileUrl: row.profile_url,
+    imageUrl: row.image_url,
+    shirtNumber: row.shirt_number,
+    starter: row.starter,
+    enteredAsSubstitute: row.entered_as_substitute,
+    entryMinute: row.entry_minute,
+  }));
 }

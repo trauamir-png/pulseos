@@ -22,6 +22,7 @@ const CONTENT_PATHS = [
   "/content/banners",
   "/content/stand-media",
   "/content/match-panel-picks",
+  "/content/match-fan-voting",
 ];
 
 function revalidateContent() {
@@ -772,4 +773,237 @@ export async function deleteMatchPanelPick(siteId: string, id: string) {
 
   revalidateContent();
   await revalidateWebsite(supabase, siteId, ["match-panel-picks"]);
+}
+
+// ---------------------------------------------------------------------------
+// Fan Match Voting -- distinct from Match Panel Picks above: this is the
+// audience's vote (מצטיין/מאכזב המשחק), not the podcast panel's own
+// selection. The two models are deliberately kept independent (separate
+// tables, separate permissions) even though they describe the same match.
+// ---------------------------------------------------------------------------
+
+export interface MatchFanPollInput {
+  externalFixtureId: string;
+  matchDate: string;
+  opponentName: string;
+  competition: string;
+  isHome: boolean;
+  homeScore: number | null;
+  awayScore: number | null;
+  isFinal: boolean;
+}
+
+function validateMatchFanPollInput(input: MatchFanPollInput) {
+  if (!input.externalFixtureId.trim()) throw new Error("A fixture id is required.");
+  if (!input.matchDate.trim()) throw new Error("A match date is required.");
+  if (!input.opponentName.trim()) throw new Error("An opponent name is required.");
+  if (input.homeScore != null && input.homeScore < 0) throw new Error("Home score can't be negative.");
+  if (input.awayScore != null && input.awayScore < 0) throw new Error("Away score can't be negative.");
+}
+
+async function getOwnFanPollOrThrow(supabase: Awaited<ReturnType<typeof createClient>>, siteId: string, pollId: string) {
+  const { data } = await supabase.from("match_fan_polls").select("id, status").eq("id", pollId).eq("site_id", siteId).maybeSingle();
+  if (!data) throw new Error("Poll not found.");
+  return data;
+}
+
+export async function createMatchFanPoll(siteId: string, input: MatchFanPollInput) {
+  validateMatchFanPollInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+  const user = await getCurrentUser(supabase);
+
+  const { data, error } = await supabase
+    .from("match_fan_polls")
+    .insert({
+      site_id: siteId,
+      external_fixture_id: input.externalFixtureId.trim(),
+      match_date: input.matchDate,
+      opponent_name: input.opponentName.trim(),
+      competition: input.competition.trim() || null,
+      is_home: input.isHome,
+      home_score: input.homeScore,
+      away_score: input.awayScore,
+      is_final: input.isFinal,
+      status: "draft",
+      created_by: user?.id ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") throw new Error("A fan vote poll for this fixture id already exists on this site.");
+    throw new Error(error.message);
+  }
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["fan-voting"]);
+  return { id: data.id };
+}
+
+/** Metadata is only editable in `draft` -- once opened, the poll is a snapshot (see PHASE 4/5 of the spec): later edits must never alter an active or historical vote. */
+export async function updateMatchFanPoll(siteId: string, id: string, input: MatchFanPollInput) {
+  validateMatchFanPollInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+
+  const existing = await getOwnFanPollOrThrow(supabase, siteId, id);
+  if (existing.status !== "draft") throw new Error("This poll is no longer a draft and can't be edited.");
+
+  const { error } = await supabase
+    .from("match_fan_polls")
+    .update({
+      external_fixture_id: input.externalFixtureId.trim(),
+      match_date: input.matchDate,
+      opponent_name: input.opponentName.trim(),
+      competition: input.competition.trim() || null,
+      is_home: input.isHome,
+      home_score: input.homeScore,
+      away_score: input.awayScore,
+      is_final: input.isFinal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("site_id", siteId);
+  if (error) {
+    if (error.code === "23505") throw new Error("A fan vote poll for this fixture id already exists on this site.");
+    throw new Error(error.message);
+  }
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["fan-voting"]);
+}
+
+export interface MatchFanPollCandidateInput {
+  playerId: string;
+  slug: string;
+  playerName: string;
+  profileUrl: string;
+  imageUrl: string;
+  shirtNumber: number | null;
+  starter: boolean;
+  enteredAsSubstitute: boolean;
+  entryMinute: number | null;
+}
+
+/** Candidates can only be added/removed while the poll is `draft` -- once open, the candidate snapshot is frozen (PHASE 3/4 of the spec: a later roster edit must never alter an already-open or historical vote). */
+export async function addMatchFanPollCandidate(siteId: string, pollId: string, input: MatchFanPollCandidateInput) {
+  if (!input.playerId.trim()) throw new Error("A player id is required.");
+  if (!input.playerName.trim()) throw new Error("A player name is required.");
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+
+  const poll = await getOwnFanPollOrThrow(supabase, siteId, pollId);
+  if (poll.status !== "draft") throw new Error("Candidates can only be edited while the poll is a draft.");
+
+  const { error } = await supabase.from("match_fan_poll_candidates").insert({
+    poll_id: pollId,
+    player_id: input.playerId.trim(),
+    slug: input.slug.trim() || null,
+    player_name: input.playerName.trim(),
+    profile_url: input.profileUrl.trim() || null,
+    image_url: input.imageUrl.trim() || null,
+    shirt_number: input.shirtNumber,
+    starter: input.starter,
+    entered_as_substitute: input.enteredAsSubstitute,
+    entry_minute: input.entryMinute,
+  });
+  if (error) {
+    if (error.code === "23505") throw new Error("This player is already a candidate for this poll.");
+    throw new Error(error.message);
+  }
+
+  revalidateContent();
+}
+
+export async function removeMatchFanPollCandidate(siteId: string, pollId: string, candidateId: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+
+  const poll = await getOwnFanPollOrThrow(supabase, siteId, pollId);
+  if (poll.status !== "draft") throw new Error("Candidates can only be edited while the poll is a draft.");
+
+  const { data, error } = await supabase.from("match_fan_poll_candidates").delete().eq("id", candidateId).eq("poll_id", pollId).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
+
+  revalidateContent();
+}
+
+/** draft -> open. Requires a final result (a poll can't open for an unfinished match) and at least one candidate. */
+export async function openMatchFanPoll(siteId: string, pollId: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+
+  const { data: poll } = await supabase
+    .from("match_fan_polls")
+    .select("id, status, is_final, home_score, away_score")
+    .eq("id", pollId)
+    .eq("site_id", siteId)
+    .maybeSingle();
+  if (!poll) throw new Error("Poll not found.");
+  if (poll.status !== "draft") throw new Error("Only a draft poll can be opened.");
+  if (!poll.is_final || poll.home_score == null || poll.away_score == null) {
+    throw new Error("The match must be marked final with both scores set before opening voting.");
+  }
+
+  const { count } = await supabase.from("match_fan_poll_candidates").select("id", { count: "exact", head: true }).eq("poll_id", pollId);
+  if (!count || count === 0) throw new Error("Add at least one candidate before opening voting.");
+
+  const { error } = await supabase
+    .from("match_fan_polls")
+    .update({ status: "open", opened_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", pollId)
+    .eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["fan-voting"]);
+}
+
+/** open -> closed. Votes are never deleted -- results remain publicly readable (PHASE 5/20 of the spec). */
+export async function closeMatchFanPoll(siteId: string, pollId: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+
+  const existing = await getOwnFanPollOrThrow(supabase, siteId, pollId);
+  if (existing.status !== "open") throw new Error("Only an open poll can be closed.");
+
+  const { error } = await supabase
+    .from("match_fan_polls")
+    .update({ status: "closed", closed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", pollId)
+    .eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["fan-voting"]);
+}
+
+/** closed -> open, for correcting an accidental early close. */
+export async function reopenMatchFanPoll(siteId: string, pollId: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_MATCH_VOTING_MANAGE);
+
+  const existing = await getOwnFanPollOrThrow(supabase, siteId, pollId);
+  if (existing.status !== "closed") throw new Error("Only a closed poll can be reopened.");
+
+  const { error } = await supabase
+    .from("match_fan_polls")
+    .update({ status: "open", updated_at: new Date().toISOString() })
+    .eq("id", pollId)
+    .eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["fan-voting"]);
 }

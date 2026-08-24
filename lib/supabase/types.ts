@@ -683,6 +683,7 @@ export interface Database {
           active: boolean;
           is_admin: boolean;
           must_change_password: boolean;
+          telegram_user_id: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -693,6 +694,7 @@ export interface Database {
           active?: boolean;
           is_admin?: boolean;
           must_change_password?: boolean;
+          telegram_user_id?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -841,6 +843,22 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["match_fan_votes"]["Insert"]>;
+        Relationships: [];
+      };
+      telegram_processed_messages: {
+        Row: {
+          telegram_chat_id: number;
+          telegram_message_id: number;
+          chat_message_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          telegram_chat_id: number;
+          telegram_message_id: number;
+          chat_message_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["telegram_processed_messages"]["Insert"]>;
         Relationships: [];
       };
     };

@@ -211,6 +211,34 @@ export async function updateUserDisplayName(userId: string, displayName: string)
 }
 
 /**
+ * Admin-only. Sets or clears the Telegram account mapped to this profile --
+ * the sole authority the Telegram -> Panelists Chat webhook uses to resolve
+ * an incoming message.from.id to a PulseOS sender. `null` unmaps the
+ * account. profiles.telegram_user_id's unique constraint (0021_telegram_chat.sql)
+ * is the real guarantee against mapping one Telegram account to two
+ * profiles; the 23505 branch here just turns that into a readable error
+ * instead of a raw Postgres message.
+ */
+export async function updateUserTelegramId(userId: string, telegramUserId: number | null): Promise<void> {
+  const actor = await getActorContext();
+  if (!actor.isAdmin) throw new UsersAccessError("Only an Admin can edit a user's Telegram account.");
+
+  if (telegramUserId !== null && (!Number.isInteger(telegramUserId) || telegramUserId <= 0)) {
+    throw new Error("Telegram user ID must be a positive whole number.");
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("profiles").update({ telegram_user_id: telegramUserId }).eq("id", userId);
+  if (error) {
+    if (error.code === "23505") throw new Error("That Telegram account is already linked to a different user.");
+    throw new Error(`Failed to update user: ${error.message}`);
+  }
+
+  revalidatePath(`/users/${userId}`);
+  revalidatePath("/users");
+}
+
+/**
  * Admin-only. Disabling denies authorization everywhere (profiles.active
  * gates is_admin/has_permission at the database layer) without deleting the
  * Auth user, memberships, or any columns.created_by history. Refuses to

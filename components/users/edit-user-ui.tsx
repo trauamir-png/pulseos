@@ -9,6 +9,7 @@ import {
   setSiteMembershipPermissions,
   setUserActive,
   updateUserDisplayName,
+  updateUserTelegramId,
 } from "@/app/(dashboard)/users/actions";
 import { PermissionChecklist } from "./permission-checklist";
 import { AvatarManager } from "@/components/account/avatar-manager";
@@ -22,6 +23,7 @@ export function ProfilePanel({
   avatarUrl,
   active,
   isAdmin,
+  telegramUserId,
   canEdit,
 }: {
   userId: string;
@@ -29,10 +31,12 @@ export function ProfilePanel({
   avatarUrl: string | null;
   active: boolean;
   isAdmin: boolean;
+  telegramUserId: number | null;
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState(displayName);
+  const [telegramId, setTelegramId] = useState(telegramUserId?.toString() ?? "");
   const [confirmingDisable, setConfirmingDisable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -46,6 +50,20 @@ export function ProfilePanel({
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to save name.");
+      }
+    });
+  }
+
+  function saveTelegramId() {
+    const trimmed = telegramId.trim();
+    if (trimmed === (telegramUserId?.toString() ?? "")) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateUserTelegramId(userId, trimmed ? Number(trimmed) : null);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to save Telegram user ID.");
       }
     });
   }
@@ -90,6 +108,19 @@ export function ProfilePanel({
           />
         </div>
         {isAdmin && <span className="mb-2.5 rounded-full bg-[var(--accent-soft)] px-2 py-1 text-xs font-semibold text-[var(--accent)]">Admin</span>}
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">Telegram user ID</label>
+        <input
+          value={telegramId}
+          onChange={(e) => setTelegramId(e.target.value)}
+          onBlur={saveTelegramId}
+          placeholder="Not linked"
+          inputMode="numeric"
+          className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+        />
+        <p className="mt-1 text-xs text-[var(--muted)]">Lets this person post into panelist chat from the Telegram group. Leave blank to unlink.</p>
       </div>
 
       {error && <p className="text-sm text-[var(--negative)]">{error}</p>}

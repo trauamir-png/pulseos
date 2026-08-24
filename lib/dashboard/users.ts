@@ -100,6 +100,7 @@ export interface UserListItem {
   avatarUrl: string | null;
   active: boolean;
   isAdmin: boolean;
+  telegramUserId: number | null;
   createdAt: string;
   /** Only sites the current actor may see: all sites for Admin, only manageableSiteIds otherwise. */
   sites: UserSiteAssignment[];
@@ -111,6 +112,7 @@ interface ProfileRow {
   avatar_url: string | null;
   active: boolean;
   is_admin: boolean;
+  telegram_user_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -182,6 +184,7 @@ export async function listUsersForActor(actor: ActorContext): Promise<UserListIt
     avatarUrl: p.avatar_url ?? null,
     active: p.active,
     isAdmin: p.is_admin,
+    telegramUserId: p.telegram_user_id ?? null,
     createdAt: p.created_at,
     sites: byUser.get(p.id) ?? [],
   }));
@@ -208,6 +211,7 @@ export async function getUserDetail(actor: ActorContext, userId: string): Promis
     avatarUrl: profile.avatar_url ?? null,
     active: profile.active,
     isAdmin: profile.is_admin,
+    telegramUserId: profile.telegram_user_id ?? null,
     createdAt: profile.created_at,
     sites,
   };

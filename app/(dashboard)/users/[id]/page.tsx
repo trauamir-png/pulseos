@@ -41,6 +41,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
         avatarUrl={user.avatarUrl}
         active={user.active}
         isAdmin={user.isAdmin}
+        telegramUserId={user.telegramUserId}
         canEdit={actor.isAdmin}
       />
 

@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Trophy,
   Vote,
+  Activity,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
@@ -46,6 +47,7 @@ export const CONTENT_ITEMS = [
   { href: "/content/stand-media", label: "Stand Media", icon: Video, permission: PERMISSIONS.CONTENT_STAND_MEDIA_VIEW },
   { href: "/content/match-panel-picks", label: "Panel Picks", icon: Trophy, permission: PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_VIEW },
   { href: "/content/match-fan-voting", label: "Fan Match Voting", icon: Vote, permission: PERMISSIONS.CONTENT_MATCH_VOTING_VIEW },
+  { href: "/content/status-snapshot", label: "תמונת מצב", icon: Activity, permission: PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_VIEW },
   { href: "/content/media", label: "Media", icon: ImageIcon, permission: PERMISSIONS.CONTENT_MEDIA_MANAGE },
   { href: "/content/authors", label: "Authors", icon: Users, permission: PERMISSIONS.CONTENT_AUTHORS_MANAGE },
   { href: "/content/categories", label: "Categories", icon: Tag, permission: PERMISSIONS.CONTENT_CATEGORIES_MANAGE },

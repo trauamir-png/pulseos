@@ -601,6 +601,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["stand_media"]["Insert"]>;
         Relationships: [];
       };
+      status_snapshots: {
+        Row: {
+          id: string;
+          site_id: string;
+          headline: string;
+          body: string;
+          status: "draft" | "published";
+          published_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          headline: string;
+          body: string;
+          status?: "draft" | "published";
+          published_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["status_snapshots"]["Insert"]>;
+        Relationships: [];
+      };
       match_panel_picks: {
         Row: {
           id: string;

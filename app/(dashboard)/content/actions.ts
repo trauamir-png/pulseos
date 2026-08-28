@@ -23,6 +23,7 @@ const CONTENT_PATHS = [
   "/content/stand-media",
   "/content/match-panel-picks",
   "/content/match-fan-voting",
+  "/content/status-snapshot",
 ];
 
 function revalidateContent() {
@@ -668,6 +669,102 @@ export async function deleteStandMedia(siteId: string, id: string) {
 
   revalidateContent();
   await revalidateWebsite(supabase, siteId, ["stand-media"]);
+}
+
+// ---------------------------------------------------------------------------
+// Status Snapshot ("תמונת מצב")
+// ---------------------------------------------------------------------------
+
+export interface StatusSnapshotInput {
+  headline: string;
+  body: string;
+}
+
+function validateStatusSnapshotInput(input: StatusSnapshotInput) {
+  if (!input.headline.trim()) throw new Error("Headline is required.");
+  if (!input.body.trim()) throw new Error("Summary is required.");
+}
+
+export async function createStatusSnapshot(siteId: string, input: StatusSnapshotInput) {
+  validateStatusSnapshotInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
+
+  const { data: userData } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from("status_snapshots")
+    .insert({
+      site_id: siteId,
+      headline: input.headline.trim(),
+      body: input.body.trim(),
+      status: "draft",
+      created_by: userData.user?.id ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+  return { id: data.id };
+}
+
+export async function updateStatusSnapshot(siteId: string, id: string, input: StatusSnapshotInput) {
+  validateStatusSnapshotInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
+
+  // Content-only update -- status/published_at are deliberately untouched so
+  // saving a Published update's text keeps it Published on the website.
+  const { error } = await supabase
+    .from("status_snapshots")
+    .update({
+      headline: input.headline.trim(),
+      body: input.body.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+}
+
+export async function setStatusSnapshotStatus(siteId: string, id: string, status: "draft" | "published") {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
+
+  const patch: Database["public"]["Tables"]["status_snapshots"]["Update"] = { status, updated_at: new Date().toISOString() };
+  if (status === "published") {
+    const { data: existing } = await supabase.from("status_snapshots").select("published_at").eq("id", id).eq("site_id", siteId).maybeSingle();
+    patch.published_at = existing?.published_at ?? new Date().toISOString();
+  }
+
+  const { error } = await supabase.from("status_snapshots").update(patch).eq("id", id).eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+}
+
+export async function deleteStatusSnapshot(siteId: string, id: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
+
+  const { data, error } = await supabase.from("status_snapshots").delete().eq("id", id).eq("site_id", siteId).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
 }
 
 // ---------------------------------------------------------------------------

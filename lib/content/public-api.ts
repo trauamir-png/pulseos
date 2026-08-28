@@ -6,6 +6,7 @@ import { derivePanelPickType, panelPickLabel } from "@/lib/content/match-result"
 type Supa = SupabaseClient<Database>;
 type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
 type StandMediaRow = Database["public"]["Tables"]["stand_media"]["Row"];
+type StatusSnapshotRow = Database["public"]["Tables"]["status_snapshots"]["Row"];
 type ChatMessagePublicRow = Database["public"]["Tables"]["chat_messages_public"]["Row"];
 type MatchPanelPickRow = Database["public"]["Tables"]["match_panel_picks"]["Row"];
 type MatchFanPollRow = Database["public"]["Tables"]["match_fan_polls"]["Row"];
@@ -171,6 +172,27 @@ export function serializePublicStandMedia(rows: StandMediaRow[]): PublicStandMed
     sortOrder: row.sort_order,
     publishedAt: row.published_at,
   }));
+}
+
+export interface PublicStatusSnapshot {
+  id: string;
+  headline: string;
+  body: string;
+  publishedAt: string | null;
+}
+
+/**
+ * Only ever called with the single latest published row (the route orders by
+ * published_at desc and limits to 1) -- created_by/status/timestamps beyond
+ * publishedAt are intentionally never exposed, same as stand media.
+ */
+export function serializePublicStatusSnapshot(row: StatusSnapshotRow): PublicStatusSnapshot {
+  return {
+    id: row.id,
+    headline: row.headline,
+    body: row.body,
+    publishedAt: row.published_at,
+  };
 }
 
 export interface PublicChatMessage {

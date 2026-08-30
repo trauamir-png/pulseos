@@ -24,6 +24,7 @@ const CONTENT_PATHS = [
   "/content/match-panel-picks",
   "/content/match-fan-voting",
   "/content/status-snapshot",
+  "/content/field-videos",
 ];
 
 function revalidateContent() {
@@ -1103,4 +1104,111 @@ export async function reopenMatchFanPoll(siteId: string, pollId: string) {
 
   revalidateContent();
   await revalidateWebsite(supabase, siteId, ["fan-voting"]);
+}
+
+// ---------------------------------------------------------------------------
+// Field Videos ("סרטונים מהשטח -- הקול מהיציע") -- distinct from Stand Media
+// ("מדיה מהיציע") above: a separate table/homepage section, deliberately not
+// mixed with it despite the identical TikTok-URL shape.
+// ---------------------------------------------------------------------------
+
+export interface FieldVideoInput {
+  caption: string;
+  tiktokUrl: string;
+  sortOrder: number;
+}
+
+function validateFieldVideoInput(input: FieldVideoInput) {
+  const url = input.tiktokUrl.trim();
+  if (!url) throw new Error("A TikTok video URL is required.");
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Enter a valid TikTok video URL.");
+  }
+  if (!/(^|\.)tiktok\.com$/i.test(parsed.hostname)) {
+    throw new Error("That doesn't look like a TikTok URL.");
+  }
+}
+
+export async function createFieldVideo(siteId: string, input: FieldVideoInput) {
+  validateFieldVideoInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_FIELD_VIDEOS_MANAGE);
+
+  const { data, error } = await supabase
+    .from("field_videos")
+    .insert({
+      site_id: siteId,
+      caption: input.caption.trim() || null,
+      tiktok_url: input.tiktokUrl.trim(),
+      sort_order: input.sortOrder,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["field-videos"]);
+  return { id: data.id };
+}
+
+export async function updateFieldVideo(siteId: string, id: string, input: FieldVideoInput) {
+  validateFieldVideoInput(input);
+
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_FIELD_VIDEOS_MANAGE);
+
+  // Content-only update -- status/published_at are deliberately untouched so
+  // saving a Published item's caption keeps it Published on the website.
+  const { error } = await supabase
+    .from("field_videos")
+    .update({
+      caption: input.caption.trim() || null,
+      tiktok_url: input.tiktokUrl.trim(),
+      sort_order: input.sortOrder,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["field-videos"]);
+}
+
+export async function setFieldVideoStatus(siteId: string, id: string, status: "draft" | "published") {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_FIELD_VIDEOS_MANAGE);
+
+  const patch: Database["public"]["Tables"]["field_videos"]["Update"] = { status, updated_at: new Date().toISOString() };
+  if (status === "published") {
+    const { data: existing } = await supabase.from("field_videos").select("published_at").eq("id", id).eq("site_id", siteId).maybeSingle();
+    patch.published_at = existing?.published_at ?? new Date().toISOString();
+  }
+
+  const { error } = await supabase.from("field_videos").update(patch).eq("id", id).eq("site_id", siteId);
+  if (error) throw new Error(error.message);
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["field-videos"]);
+}
+
+export async function deleteFieldVideo(siteId: string, id: string) {
+  const supabase = await createClient();
+  await requireSiteAccess(supabase, siteId);
+  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_FIELD_VIDEOS_MANAGE);
+
+  const { data, error } = await supabase.from("field_videos").delete().eq("id", id).eq("site_id", siteId).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
+
+  revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["field-videos"]);
 }

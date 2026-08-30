@@ -7,6 +7,7 @@ type Supa = SupabaseClient<Database>;
 type ColumnRow = Database["public"]["Tables"]["columns"]["Row"];
 type StandMediaRow = Database["public"]["Tables"]["stand_media"]["Row"];
 type StatusSnapshotRow = Database["public"]["Tables"]["status_snapshots"]["Row"];
+type FieldVideoRow = Database["public"]["Tables"]["field_videos"]["Row"];
 type ChatMessagePublicRow = Database["public"]["Tables"]["chat_messages_public"]["Row"];
 type MatchPanelPickRow = Database["public"]["Tables"]["match_panel_picks"]["Row"];
 type MatchFanPollRow = Database["public"]["Tables"]["match_fan_polls"]["Row"];
@@ -193,6 +194,30 @@ export function serializePublicStatusSnapshot(row: StatusSnapshotRow): PublicSta
     body: row.body,
     publishedAt: row.published_at,
   };
+}
+
+export interface PublicFieldVideo {
+  id: string;
+  caption: string | null;
+  tiktokUrl: string;
+  sortOrder: number;
+  publishedAt: string | null;
+}
+
+/**
+ * Separate content type from Stand Media ("מדיה מהיציע") despite the
+ * identical shape -- this is the "Videos from the field" homepage section,
+ * a different table entirely (field_videos, 0023_field_videos.sql). No
+ * related entities to batch-resolve, same as Stand Media.
+ */
+export function serializePublicFieldVideos(rows: FieldVideoRow[]): PublicFieldVideo[] {
+  return rows.map((row) => ({
+    id: row.id,
+    caption: row.caption,
+    tiktokUrl: row.tiktok_url,
+    sortOrder: row.sort_order,
+    publishedAt: row.published_at,
+  }));
 }
 
 export interface PublicChatMessage {

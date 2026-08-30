@@ -627,6 +627,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["status_snapshots"]["Insert"]>;
         Relationships: [];
       };
+      field_videos: {
+        Row: {
+          id: string;
+          site_id: string;
+          tiktok_url: string;
+          caption: string | null;
+          status: "draft" | "published";
+          published_at: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          tiktok_url: string;
+          caption?: string | null;
+          status?: "draft" | "published";
+          published_at?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["field_videos"]["Insert"]>;
+        Relationships: [];
+      };
       match_panel_picks: {
         Row: {
           id: string;

@@ -104,6 +104,7 @@ export async function createColumn(siteId: string, input: ColumnInput) {
   if (error) throw new Error(error.message);
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["columns"]);
   return { id: data.id };
 }
 
@@ -151,6 +152,7 @@ export async function updateColumn(siteId: string, id: string, input: ColumnInpu
   if (error) throw new Error(error.message);
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["columns"]);
 }
 
 export async function setColumnStatus(siteId: string, id: string, status: ColumnStatus, scheduledAt?: string) {
@@ -190,6 +192,7 @@ export async function setColumnStatus(siteId: string, id: string, status: Column
   if (error) throw new Error(error.message);
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["columns"]);
 }
 
 export async function deleteColumn(siteId: string, id: string) {
@@ -202,6 +205,7 @@ export async function deleteColumn(siteId: string, id: string) {
   if (!data || data.length === 0) throw new Error("Delete did not go through. Nothing was deleted.");
 
   revalidateContent();
+  await revalidateWebsite(supabase, siteId, ["columns"]);
 }
 
 // ---------------------------------------------------------------------------

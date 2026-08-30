@@ -23,6 +23,7 @@ import {
   Trophy,
   Vote,
   Activity,
+  Clapperboard,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
@@ -45,6 +46,7 @@ export const CONTENT_ITEMS = [
   { href: "/content/columns", label: "Columns", icon: Newspaper, permission: PERMISSIONS.CONTENT_COLUMNS_VIEW },
   { href: "/content/banners", label: "Banners", icon: GalleryHorizontal, permission: PERMISSIONS.CONTENT_BANNERS_MANAGE },
   { href: "/content/stand-media", label: "Stand Media", icon: Video, permission: PERMISSIONS.CONTENT_STAND_MEDIA_VIEW },
+  { href: "/content/field-videos", label: "סרטונים מהשטח", icon: Clapperboard, permission: PERMISSIONS.CONTENT_FIELD_VIDEOS_VIEW },
   { href: "/content/match-panel-picks", label: "Panel Picks", icon: Trophy, permission: PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_VIEW },
   { href: "/content/match-fan-voting", label: "Fan Match Voting", icon: Vote, permission: PERMISSIONS.CONTENT_MATCH_VOTING_VIEW },
   { href: "/content/status-snapshot", label: "תמונת מצב", icon: Activity, permission: PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_VIEW },

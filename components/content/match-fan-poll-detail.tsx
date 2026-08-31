@@ -84,7 +84,8 @@ export function MatchFanPollDetail({
     });
   }
 
-  const resultByCandidate = new Map((results?.candidates ?? []).map((c) => [c.candidateId, c]));
+  const nameByCandidate = new Map(candidates.map((c) => [c.id, c.playerName]));
+  const sortedResults = results ? [...results.candidates].sort((a, b) => b.voteCount - a.voteCount) : [];
 
   return (
     <div className="space-y-6">
@@ -134,7 +135,6 @@ export function MatchFanPollDetail({
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-[var(--foreground)]">Candidates</h2>
-          {results && <p className="text-xs text-[var(--muted)]">{results.totalVotes} total votes</p>}
         </div>
 
         {candidates.length === 0 ? (
@@ -142,7 +142,6 @@ export function MatchFanPollDetail({
         ) : (
           <div className="space-y-2">
             {candidates.map((c) => {
-              const result = resultByCandidate.get(c.id);
               return (
                 <div key={c.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2">
                   <div dir="auto">
@@ -154,22 +153,15 @@ export function MatchFanPollDetail({
                       {c.starter ? "Starter" : c.enteredAsSubstitute ? `Substitute${c.entryMinute != null ? ` (${c.entryMinute}')` : ""}` : "Bench"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {result && (
-                      <span className="text-xs text-[var(--muted)]">
-                        {result.voteCount} votes · {result.percentage}%
-                      </span>
-                    )}
-                    {draft && (
-                      <button
-                        onClick={() => handleRemoveCandidate(c.id, c.playerName)}
-                        disabled={pending}
-                        className="text-xs font-medium text-[var(--negative)] hover:underline disabled:opacity-60"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
+                  {draft && (
+                    <button
+                      onClick={() => handleRemoveCandidate(c.id, c.playerName)}
+                      disabled={pending}
+                      className="text-xs font-medium text-[var(--negative)] hover:underline disabled:opacity-60"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -257,6 +249,32 @@ export function MatchFanPollDetail({
           </div>
         )}
       </div>
+
+      {results && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Results</h2>
+            <p className="text-sm text-[var(--foreground)]" dir="rtl">
+              סה״כ מצביעים: {results.totalVotes}
+            </p>
+          </div>
+          <div className="space-y-3">
+            {sortedResults.map((r) => (
+              <div key={r.candidateId} className="space-y-1">
+                <div className="flex items-center justify-between gap-3 text-sm" dir="auto">
+                  <span className="font-medium text-[var(--foreground)]">{nameByCandidate.get(r.candidateId) ?? "—"}</span>
+                  <span className="shrink-0 text-xs text-[var(--muted)]">
+                    {r.voteCount} · {r.percentage}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]">
+                  <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${r.percentage}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -304,9 +304,9 @@ function DeleteSiteDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-24" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 px-4 pt-16 sm:pt-24" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-white p-5 shadow-lg"
+        className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-sm font-semibold text-[var(--foreground)]">Delete site</h2>

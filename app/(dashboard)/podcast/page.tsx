@@ -223,33 +223,35 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
             {topEpisodes.length === 0 ? (
               <p className="py-8 text-center text-sm text-[var(--muted)]">No episode listens in this range yet.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                    <th className="pb-2">Episode</th>
-                    <th className="pb-2">Listens</th>
-                    <th className="pb-2">Unique listeners</th>
-                    <th className="pb-2">Avg listening time</th>
-                    <th className="pb-2">Completion rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topEpisodes.map((ep) => (
-                    <tr key={ep.episodeId} className="border-t border-[var(--border)]">
-                      <td className="py-2">
-                        <Link href={`/podcast/episodes/${ep.episodeId}${detailQuery}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
-                          {ep.episodeNumber != null ? `#${ep.episodeNumber} · ` : ""}
-                          {ep.title}
-                        </Link>
-                      </td>
-                      <td className="py-2 text-[var(--foreground)]">{ep.listens.toLocaleString()}</td>
-                      <td className="py-2 text-[var(--foreground)]">{ep.uniqueListeners.toLocaleString()}</td>
-                      <td className="py-2 text-[var(--foreground)]">{formatSeconds(ep.avgListeningSeconds)}</td>
-                      <td className="py-2 text-[var(--foreground)]">{ep.completionRate.toFixed(1)}%</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                      <th className="pb-2">Episode</th>
+                      <th className="pb-2">Listens</th>
+                      <th className="pb-2">Unique listeners</th>
+                      <th className="pb-2">Avg listening time</th>
+                      <th className="pb-2">Completion rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {topEpisodes.map((ep) => (
+                      <tr key={ep.episodeId} className="border-t border-[var(--border)]">
+                        <td className="py-2">
+                          <Link href={`/podcast/episodes/${ep.episodeId}${detailQuery}`} className="font-medium text-[var(--foreground)] hover:text-[var(--accent)]">
+                            {ep.episodeNumber != null ? `#${ep.episodeNumber} · ` : ""}
+                            {ep.title}
+                          </Link>
+                        </td>
+                        <td className="py-2 text-[var(--foreground)]">{ep.listens.toLocaleString()}</td>
+                        <td className="py-2 text-[var(--foreground)]">{ep.uniqueListeners.toLocaleString()}</td>
+                        <td className="py-2 text-[var(--foreground)]">{formatSeconds(ep.avgListeningSeconds)}</td>
+                        <td className="py-2 text-[var(--foreground)]">{ep.completionRate.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -283,28 +285,30 @@ export default async function PodcastOverviewPage({ searchParams }: { searchPara
               {sources.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[var(--muted)]">No source data in this range yet.</p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                      <th className="pb-2">Source</th>
-                      <th className="pb-2">Visitors</th>
-                      <th className="pb-2">Listen starts</th>
-                      <th className="pb-2">Avg time</th>
-                      <th className="pb-2">Completion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sources.map((s) => (
-                      <tr key={s.source} className="border-t border-[var(--border)]">
-                        <td className="py-2 capitalize text-[var(--foreground)]">{s.source}</td>
-                        <td className="py-2 text-[var(--foreground)]">{s.visitors.toLocaleString()}</td>
-                        <td className="py-2 text-[var(--foreground)]">{s.listenStarts.toLocaleString()}</td>
-                        <td className="py-2 text-[var(--foreground)]">{formatSeconds(s.avgListeningSeconds)}</td>
-                        <td className="py-2 text-[var(--foreground)]">{s.completionRate.toFixed(1)}%</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                        <th className="pb-2">Source</th>
+                        <th className="pb-2">Visitors</th>
+                        <th className="pb-2">Listen starts</th>
+                        <th className="pb-2">Avg time</th>
+                        <th className="pb-2">Completion</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {sources.map((s) => (
+                        <tr key={s.source} className="border-t border-[var(--border)]">
+                          <td className="py-2 capitalize text-[var(--foreground)]">{s.source}</td>
+                          <td className="py-2 text-[var(--foreground)]">{s.visitors.toLocaleString()}</td>
+                          <td className="py-2 text-[var(--foreground)]">{s.listenStarts.toLocaleString()}</td>
+                          <td className="py-2 text-[var(--foreground)]">{formatSeconds(s.avgListeningSeconds)}</td>
+                          <td className="py-2 text-[var(--foreground)]">{s.completionRate.toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>

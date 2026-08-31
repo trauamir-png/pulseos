@@ -154,25 +154,27 @@ export function PodbeanSection(props: PodbeanSectionProps) {
             {topEpisodes.length === 0 ? (
               <p className="py-6 text-center text-xs text-[var(--muted)]">No episode download data in this range yet.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                    <th className="pb-2">Episode</th>
-                    <th className="pb-2">Downloads</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topEpisodes.map((ep) => (
-                    <tr key={ep.episodeId} className="border-t border-orange-100">
-                      <td className="py-2 text-[var(--foreground)]">
-                        {ep.episodeNumber != null ? `#${ep.episodeNumber} · ` : ""}
-                        {ep.title}
-                      </td>
-                      <td className="py-2 font-medium text-[var(--foreground)]">{ep.downloads.toLocaleString()}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                      <th className="pb-2">Episode</th>
+                      <th className="pb-2">Downloads</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {topEpisodes.map((ep) => (
+                      <tr key={ep.episodeId} className="border-t border-orange-100">
+                        <td className="py-2 text-[var(--foreground)]">
+                          {ep.episodeNumber != null ? `#${ep.episodeNumber} · ` : ""}
+                          {ep.title}
+                        </td>
+                        <td className="py-2 font-medium text-[var(--foreground)]">{ep.downloads.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 

@@ -211,28 +211,30 @@ export default async function EpisodeDetailPage({
               {detail.sources.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[var(--muted)]">No source data yet.</p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                      <th className="pb-2">Source</th>
-                      <th className="pb-2">Visitors</th>
-                      <th className="pb-2">Listen starts</th>
-                      <th className="pb-2">Avg time</th>
-                      <th className="pb-2">Completion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.sources.map((s) => (
-                      <tr key={s.source} className="border-t border-[var(--border)]">
-                        <td className="py-2 capitalize text-[var(--foreground)]">{s.source}</td>
-                        <td className="py-2 text-[var(--foreground)]">{s.visitors.toLocaleString()}</td>
-                        <td className="py-2 text-[var(--foreground)]">{s.listenStarts.toLocaleString()}</td>
-                        <td className="py-2 text-[var(--foreground)]">{formatSeconds(s.avgListeningSeconds)}</td>
-                        <td className="py-2 text-[var(--foreground)]">{s.completionRate.toFixed(1)}%</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                        <th className="pb-2">Source</th>
+                        <th className="pb-2">Visitors</th>
+                        <th className="pb-2">Listen starts</th>
+                        <th className="pb-2">Avg time</th>
+                        <th className="pb-2">Completion</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {detail.sources.map((s) => (
+                        <tr key={s.source} className="border-t border-[var(--border)]">
+                          <td className="py-2 capitalize text-[var(--foreground)]">{s.source}</td>
+                          <td className="py-2 text-[var(--foreground)]">{s.visitors.toLocaleString()}</td>
+                          <td className="py-2 text-[var(--foreground)]">{s.listenStarts.toLocaleString()}</td>
+                          <td className="py-2 text-[var(--foreground)]">{formatSeconds(s.avgListeningSeconds)}</td>
+                          <td className="py-2 text-[var(--foreground)]">{s.completionRate.toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
@@ -266,24 +268,26 @@ export default async function EpisodeDetailPage({
             {detail.recentActivity.length === 0 ? (
               <p className="py-8 text-center text-sm text-[var(--muted)]">No recent events.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                    <th className="pb-2">Event</th>
-                    <th className="pb-2">Source</th>
-                    <th className="pb-2">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.recentActivity.map((a, i) => (
-                    <tr key={i} className="border-t border-[var(--border)]">
-                      <td className="py-2 text-[var(--foreground)]">{a.eventName}</td>
-                      <td className="py-2 capitalize text-[var(--foreground)]">{a.trafficSource}</td>
-                      <td className="py-2 text-[var(--muted)]">{format(new Date(a.occurredAt), "MMM d, HH:mm", { timeZone: range.timezone })}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                      <th className="pb-2">Event</th>
+                      <th className="pb-2">Source</th>
+                      <th className="pb-2">Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {detail.recentActivity.map((a, i) => (
+                      <tr key={i} className="border-t border-[var(--border)]">
+                        <td className="py-2 text-[var(--foreground)]">{a.eventName}</td>
+                        <td className="py-2 capitalize text-[var(--foreground)]">{a.trafficSource}</td>
+                        <td className="py-2 text-[var(--muted)]">{format(new Date(a.occurredAt), "MMM d, HH:mm", { timeZone: range.timezone })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </>

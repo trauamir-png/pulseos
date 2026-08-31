@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { LogOut, ChevronDown, User } from "lucide-react";
+import { LogOut, ChevronDown, User, Menu } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { RANGE_PRESET_LABELS, type RangePreset } from "@/lib/analytics/date-range";
 import type { SiteRecord } from "@/lib/dashboard/site";
+import { useMobileNav } from "@/components/mobile-nav-context";
 
 const PRESETS: RangePreset[] = ["today", "yesterday", "7d", "30d", "90d", "custom"];
 
@@ -15,6 +16,7 @@ export function Topbar({ sites }: { sites: SiteRecord[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [customOpen, setCustomOpen] = useState(false);
+  const { setOpen: setMobileNavOpen } = useMobileNav();
 
   const selectedSiteId = searchParams.get("site") || sites[0]?.id || "";
   const currentRange = (searchParams.get("range") as RangePreset) || "7d";
@@ -56,29 +58,38 @@ export function Topbar({ sites }: { sites: SiteRecord[] }) {
   }
 
   return (
-    <header className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="relative">
-        <select
-          value={selectedSiteId}
-          onChange={(e) => setParam("site", e.target.value)}
-          className="appearance-none rounded-lg border border-[var(--border)] bg-white py-1.5 pl-3 pr-8 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+    <header className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open menu"
+          className="shrink-0 rounded-lg border border-[var(--border)] bg-white p-2 text-[var(--foreground)] md:hidden"
         >
-          {sites.map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+          <Menu size={18} />
+        </button>
+        <div className="relative">
+          <select
+            value={selectedSiteId}
+            onChange={(e) => setParam("site", e.target.value)}
+            className="appearance-none rounded-lg border border-[var(--border)] bg-white py-1.5 pl-3 pr-8 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+          >
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex rounded-lg border border-[var(--border)] bg-white p-0.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex max-w-full overflow-x-auto rounded-lg border border-[var(--border)] bg-white p-0.5">
           {PRESETS.map((preset) => (
             <button
               key={preset}
               onClick={() => handleRangeChange(preset)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+              className={`shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition ${
                 currentRange === preset
                   ? "bg-[var(--accent)] text-white"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -134,9 +145,9 @@ function CustomRangePopover({
   const [to, setTo] = useState(initialTo || today);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-24" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 px-4 pt-16 sm:pt-24" onClick={onClose}>
       <div
-        className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-lg"
+        className="max-h-[85vh] w-full max-w-xs overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex gap-3">

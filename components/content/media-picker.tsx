@@ -141,8 +141,8 @@ export function MediaPicker({
             </div>
             {error && <p className="mt-2 text-xs text-[var(--negative)]">{error}</p>}
 
-            <div className="mt-4 grid grid-cols-4 gap-3">
-              {filtered.length === 0 && <p className="col-span-4 py-8 text-center text-sm text-[var(--muted)]">No media found.</p>}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {filtered.length === 0 && <p className="col-span-2 py-8 text-center text-sm text-[var(--muted)] sm:col-span-4">No media found.</p>}
               {filtered.map((asset) => (
                 <button
                   key={asset.id}

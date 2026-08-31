@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { MobileNavProvider } from "@/components/mobile-nav-context";
 import { listAccessibleSites } from "@/lib/dashboard/site";
 import { createClient } from "@/lib/supabase/server";
 import { isAdmin as checkIsAdmin, getPermissionsForSite } from "@/lib/auth/permissions";
@@ -36,16 +37,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const [sites, access] = await Promise.all([listAccessibleSites(), loadSidebarAccess()]);
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
-      <Suspense fallback={null}>
-        <Sidebar sites={sites} isAdmin={access.isAdmin} permissionsBySite={access.permissionsBySite} />
-      </Suspense>
-      <div className="flex min-h-screen flex-1 flex-col">
-        <Suspense fallback={<div className="h-[57px] border-b border-[var(--border)] bg-[var(--surface)]" />}>
-          <Topbar sites={sites} />
+    <MobileNavProvider>
+      <div className="flex min-h-screen bg-[var(--background)]">
+        <Suspense fallback={null}>
+          <Sidebar sites={sites} isAdmin={access.isAdmin} permissionsBySite={access.permissionsBySite} />
         </Suspense>
-        <main className="flex-1 overflow-y-auto px-6 py-6">{children}</main>
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <Suspense fallback={<div className="h-[57px] border-b border-[var(--border)] bg-[var(--surface)]" />}>
+            <Topbar sites={sites} />
+          </Suspense>
+          <main className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-6 sm:px-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </MobileNavProvider>
   );
 }

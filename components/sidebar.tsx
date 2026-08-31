@@ -24,10 +24,12 @@ import {
   Vote,
   Activity,
   Clapperboard,
+  X,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import { hasModule } from "@/lib/dashboard/modules";
 import { PERMISSIONS, type PermissionKey } from "@/lib/auth/permission-definitions";
+import { useMobileNav } from "@/components/mobile-nav-context";
 
 export const WEB_ANALYTICS_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: PERMISSIONS.ANALYTICS_DASHBOARD_VIEW },
@@ -107,6 +109,7 @@ export function Sidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const query = searchParams.toString();
+  const { open, setOpen } = useMobileNav();
 
   const requestedId = searchParams.get("site") ?? undefined;
   const site = (requestedId ? sites.find((s) => s.id === requestedId) : undefined) ?? sites.find((s) => s.active) ?? sites[0] ?? null;
@@ -131,6 +134,7 @@ export function Sidebar({
       <Link
         key={href}
         href={query ? `${href}?${query}` : href}
+        onClick={() => setOpen(false)}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
           active
             ? "bg-[var(--accent-soft)] text-[var(--accent)]"
@@ -144,14 +148,35 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-sm font-semibold text-white">
-          P
+    <>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-56 max-w-[85vw] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2 px-5 py-5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-sm font-semibold text-white">
+              P
+            </div>
+            <span className="text-base font-semibold text-[var(--foreground)]">PulseOS</span>
+          </div>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+            className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-gray-50 md:hidden"
+          >
+            <X size={18} />
+          </button>
         </div>
-        <span className="text-base font-semibold text-[var(--foreground)]">PulseOS</span>
-      </div>
-      <nav className="flex-1 space-y-4 px-3">
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3">
         {showWebAnalytics && visibleWebAnalytics.length > 0 && (
           <div className="space-y-0.5">
             {visibleWebAnalytics.map(({ href, label, icon }) => renderLink(href, label, icon))}
@@ -184,6 +209,7 @@ export function Sidebar({
           <div className="space-y-0.5">{GLOBAL_ITEMS.map(({ href, label, icon }) => renderLink(href, label, icon))}</div>
         )}
       </nav>
-    </aside>
+      </aside>
+    </>
   );
 }

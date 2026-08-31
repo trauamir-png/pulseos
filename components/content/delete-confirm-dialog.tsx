@@ -39,8 +39,11 @@ export function DeleteConfirmDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-24" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-white p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 px-4 pt-16 sm:pt-24" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-5 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-sm font-semibold text-[var(--foreground)]">Delete {entityLabel}</h2>
         <p className="mt-2 text-sm text-[var(--muted)]">{description ?? "This cannot be undone."}</p>
         <label className="mb-1.5 mt-4 block text-xs font-medium text-[var(--foreground)]">Type &quot;{confirmText}&quot; to confirm</label>

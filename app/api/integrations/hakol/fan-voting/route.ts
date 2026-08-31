@@ -29,6 +29,14 @@ const bodySchema = z.object({
   awayScore: z.number().int().nullable().optional(),
   isFinal: z.boolean(),
   candidates: z.array(candidateSchema).default([]),
+  /**
+   * When true and the poll is currently `draft`, transitions it to `open` in
+   * the same request (the minute-65 live-eligibility call). No-op if already
+   * `open` (idempotent -- repeating the same request never re-opens/re-stamps
+   * `opened_at`). Never reopens a `closed` poll -- that stays fully frozen,
+   * same as before this field existed.
+   */
+  autoOpen: z.boolean().optional(),
 });
 
 /**
@@ -52,12 +60,33 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 /**
- * Upserts a draft poll + its candidate snapshot from Hakol's scraper output,
- * keyed on (site_id, external_fixture_id). Deliberately a no-op on the match
- * fields and candidates once the poll is no longer `draft` -- an open or
- * closed poll is a frozen snapshot (PHASE 4/5 of the spec: a later scrape
- * must never alter an active or historical vote). A PulseOS manager still
- * has to open voting by hand; this endpoint never changes `status` itself.
+ * Upserts a poll + its candidate snapshot from Hakol's scraper output, keyed
+ * on (site_id, external_fixture_id), and supports the full automatic
+ * lifecycle: draft -> open (via `autoOpen`) -> live safe updates -> final
+ * score/isFinal update, all on the SAME row (never a second poll for the
+ * same fixture, enforced by the unique (site_id, external_fixture_id)
+ * constraint + this select-before-write check).
+ *
+ * A `closed` poll is always fully frozen -- no field update, no candidate
+ * change, no `autoOpen` reopen. That transition stays a manual dashboard-only
+ * action (app/(dashboard)/content/actions.ts's closeMatchFanPoll), untouched
+ * by this route.
+ *
+ * A `draft` poll accepts a full field update (its match identity -- date,
+ * opponent, home/away, competition -- isn't public yet, so it's safe to
+ * correct). Once `open`, fans may already be voting on this exact match
+ * identity, so only match-state fields that can legitimately change while
+ * live/after full time stay writable: `is_final`, `home_score`,
+ * `away_score`. `match_date`/`opponent_name`/`competition`/`is_home` are
+ * frozen the moment a poll opens, same spirit as the candidate snapshot.
+ *
+ * Candidates: the existing upsert on (poll_id, player_id) already gives
+ * idempotent, duplicate-free, ID-stable candidate writes (an update on
+ * conflict never touches the row's `id`, so any vote's
+ * (candidate_id, poll_id) FK stays valid) -- this route now also runs that
+ * loop for `open` polls, which is exactly what's needed to let a
+ * newly-entered substitute be added mid-match. No candidate is ever deleted
+ * here, so existing votes are never at risk.
  */
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
@@ -90,12 +119,14 @@ export async function POST(request: NextRequest) {
     .eq("external_fixture_id", input.fixtureId)
     .maybeSingle();
 
-  if (existing && existing.status !== "draft") {
-    return NextResponse.json({ ok: true, pollId: existing.id, status: existing.status, snapshotFrozen: true }, { status: 200 });
+  if (existing?.status === "closed") {
+    return NextResponse.json({ ok: true, pollId: existing.id, status: "closed", snapshotFrozen: true }, { status: 200 });
   }
 
   let pollId = existing?.id;
-  if (pollId) {
+  let status: "draft" | "open" = existing?.status === "open" ? "open" : "draft";
+
+  if (pollId && status === "draft") {
     const { error } = await admin
       .from("match_fan_polls")
       .update({
@@ -103,6 +134,17 @@ export async function POST(request: NextRequest) {
         opponent_name: input.opponentName,
         competition: input.competition ?? null,
         is_home: input.isHome,
+        home_score: input.homeScore ?? null,
+        away_score: input.awayScore ?? null,
+        is_final: input.isFinal,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", pollId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  } else if (pollId && status === "open") {
+    const { error } = await admin
+      .from("match_fan_polls")
+      .update({
         home_score: input.homeScore ?? null,
         away_score: input.awayScore ?? null,
         is_final: input.isFinal,
@@ -131,6 +173,7 @@ export async function POST(request: NextRequest) {
     pollId = data.id;
   }
 
+  // Never runs for a closed poll -- handled by the early return above.
   for (const candidate of input.candidates) {
     const { error } = await admin.from("match_fan_poll_candidates").upsert(
       {
@@ -150,5 +193,19 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, pollId, status: "draft", snapshotFrozen: false }, { status: 200 });
+  // draft -> open only. Guarded by .eq("status", "draft") so a second
+  // concurrent/idempotent request can never re-stamp opened_at once it's
+  // already open, and this can never fire for a closed poll (already
+  // returned above).
+  if (input.autoOpen && status === "draft") {
+    const { error } = await admin
+      .from("match_fan_polls")
+      .update({ status: "open", opened_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", pollId)
+      .eq("status", "draft");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    status = "open";
+  }
+
+  return NextResponse.json({ ok: true, pollId, status, snapshotFrozen: false }, { status: 200 });
 }

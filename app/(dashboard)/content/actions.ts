@@ -1038,7 +1038,7 @@ export async function removeMatchFanPollCandidate(siteId: string, pollId: string
   revalidateContent();
 }
 
-/** draft -> open. Requires a final result (a poll can't open for an unfinished match) and at least one candidate. */
+/** draft -> open. Requires at least one candidate. The match may already be final (normal post-match voting) or still live (isFinal: false, for in-match voting opened before full time) -- either way the poll opens as a real, non-fake snapshot; no result is ever synthesized. */
 export async function openMatchFanPoll(siteId: string, pollId: string) {
   const supabase = await createClient();
   await requireSiteAccess(supabase, siteId);
@@ -1046,15 +1046,12 @@ export async function openMatchFanPoll(siteId: string, pollId: string) {
 
   const { data: poll } = await supabase
     .from("match_fan_polls")
-    .select("id, status, is_final, home_score, away_score")
+    .select("id, status")
     .eq("id", pollId)
     .eq("site_id", siteId)
     .maybeSingle();
   if (!poll) throw new Error("Poll not found.");
   if (poll.status !== "draft") throw new Error("Only a draft poll can be opened.");
-  if (!poll.is_final || poll.home_score == null || poll.away_score == null) {
-    throw new Error("The match must be marked final with both scores set before opening voting.");
-  }
 
   const { count } = await supabase.from("match_fan_poll_candidates").select("id", { count: "exact", head: true }).eq("poll_id", pollId);
   if (!count || count === 0) throw new Error("Add at least one candidate before opening voting.");

@@ -290,7 +290,7 @@ export interface PublicFanVotePoll {
   competition: string | null;
   isHome: boolean;
   status: "open" | "closed";
-  voteType: "best" | "disappointing";
+  voteType: "best" | "disappointing" | "live";
   label: string;
 }
 
@@ -301,11 +301,33 @@ export interface PublicFanVotePoll {
  * the query this feeds, so it's indistinguishable from a nonexistent poll to
  * the public API (an intentional, conservative reading of "don't leak an
  * unopened poll's existence"). vote_type/label are derived, never stored,
- * same as match_panel_picks. A not-final/unscored row is filtered out
- * defensively even though status open/closed should imply is_final=true.
+ * same as match_panel_picks.
+ *
+ * An `open` poll for a still-live match (is_final: false) serializes with
+ * voteType "live" instead of running it through derivePanelPickType, which
+ * only ever answers for a final match -- this never fakes a win/draw/loss.
+ * A `closed` poll is still required to have a real final outcome (closing
+ * only ever happens after opening, and only a final match's poll should ever
+ * reach closed); a not-final/unscored closed row is filtered out defensively,
+ * unchanged from before.
  */
 export function serializePublicFanVotePoll(row: MatchFanPollRow): PublicFanVotePoll | null {
   if (row.status !== "open" && row.status !== "closed") return null;
+
+  if (row.status === "open" && !row.is_final) {
+    return {
+      id: row.id,
+      fixtureId: row.external_fixture_id,
+      matchDate: row.match_date,
+      opponentName: row.opponent_name,
+      competition: row.competition,
+      isHome: row.is_home,
+      status: row.status,
+      voteType: "live",
+      label: "הצבעה חיה",
+    };
+  }
+
   const voteType = derivePanelPickType({ isHome: row.is_home, homeScore: row.home_score, awayScore: row.away_score, isFinal: row.is_final });
   if (!voteType) return null;
   return {

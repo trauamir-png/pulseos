@@ -602,6 +602,8 @@ export async function createStandMedia(siteId: string, input: StandMediaInput) {
   await requireSiteAccess(supabase, siteId);
   await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STAND_MEDIA_MANAGE);
 
+  // TEMPORARY: remove this diagnostic block once the #441 root cause is found.
+  console.log("[stand-media-441] createStandMedia: before insert", { siteId });
   const { data, error } = await supabase
     .from("stand_media")
     .insert({
@@ -613,10 +615,19 @@ export async function createStandMedia(siteId: string, input: StandMediaInput) {
     })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("[stand-media-441] createStandMedia: insert failed", { siteId, errorMessage: error.message });
+    throw new Error(error.message);
+  }
+  console.log("[stand-media-441] createStandMedia: insert succeeded", { siteId, id: data.id });
 
   revalidateContent();
+
+  console.log("[stand-media-441] createStandMedia: before revalidateWebsite", { siteId, id: data.id });
   await revalidateWebsite(supabase, siteId, ["stand-media"]);
+  console.log("[stand-media-441] createStandMedia: after revalidateWebsite", { siteId, id: data.id });
+
+  console.log("[stand-media-441] createStandMedia: returning to client", { id: data.id });
   return { id: data.id };
 }
 

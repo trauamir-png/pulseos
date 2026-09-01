@@ -44,6 +44,9 @@ export function StandMediaForm({
           router.refresh();
         } else {
           const { id } = await createStandMedia(siteId, input);
+          // TEMPORARY: remove these diagnostic logs once the #441 root cause is found.
+          console.log("[stand-media-441] client: createStandMedia resolved", { id });
+          console.log("[stand-media-441] client: before router.push", { id });
           router.push(`/content/stand-media/${id}${query}`);
         }
       } catch (e) {

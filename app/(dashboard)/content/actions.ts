@@ -726,7 +726,7 @@ export async function updateStatusSnapshot(siteId: string, id: string, input: St
 
   // Content-only update -- status/published_at are deliberately untouched so
   // saving a Published update's text keeps it Published on the website.
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("status_snapshots")
     .update({
       headline: input.headline.trim(),
@@ -734,8 +734,10 @@ export async function updateStatusSnapshot(siteId: string, id: string, input: St
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("site_id", siteId);
+    .eq("site_id", siteId)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Update did not go through. Nothing was updated.");
 
   revalidateContent();
   await revalidateWebsite(supabase, siteId, ["status-snapshot"]);

@@ -36,8 +36,12 @@ export function StatusSnapshotForm({
     startTransition(async () => {
       try {
         if (item) {
+          // updateStatusSnapshot calls revalidatePath, so Next.js already
+          // bundles a fresh render of this route into the action's own
+          // response and commits it as a seeded navigation -- no separate
+          // router.refresh() is needed (and calling one anyway forced a
+          // second, redundant round-trip re-render of this same route).
           await updateStatusSnapshot(siteId, item.id, input);
-          router.refresh();
         } else {
           const { id } = await createStatusSnapshot(siteId, input);
           router.push(`/content/status-snapshot/${id}${query}`);
@@ -53,8 +57,9 @@ export function StatusSnapshotForm({
     setError(null);
     startStatusTransition(async () => {
       try {
+        // Same reasoning as handleSave: setStatusSnapshotStatus's own
+        // revalidatePath call already refreshes this route.
         await setStatusSnapshotStatus(siteId, item.id, item.status === "published" ? "draft" : "published");
-        router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "עדכון הסטטוס נכשל.");
       }

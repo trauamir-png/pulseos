@@ -41,13 +41,6 @@ export async function getStatusSnapshotsForSite(supabase: Supa, siteId: string):
 }
 
 export async function getStatusSnapshotById(supabase: Supa, siteId: string, id: string): Promise<StatusSnapshotRecord | null> {
-  // TEMPORARY: remove this diagnostic block once the #441 root cause is found.
-  console.log("[STATUS_SNAPSHOT_DEBUG] getStatusSnapshotById: fetch entered", { siteId, id });
-  const { data, error } = await supabase.from("status_snapshots").select("*").eq("id", id).eq("site_id", siteId).maybeSingle();
-  if (error) {
-    console.error("[STATUS_SNAPSHOT_DEBUG] getStatusSnapshotById: fetch error", { siteId, id, errorMessage: error.message });
-  } else {
-    console.log("[STATUS_SNAPSHOT_DEBUG] getStatusSnapshotById: fetch result", { siteId, id, found: !!data });
-  }
+  const { data } = await supabase.from("status_snapshots").select("*").eq("id", id).eq("site_id", siteId).maybeSingle();
   return data ? toRecord(data) : null;
 }

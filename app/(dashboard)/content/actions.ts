@@ -718,29 +718,63 @@ export async function createStatusSnapshot(siteId: string, input: StatusSnapshot
 }
 
 export async function updateStatusSnapshot(siteId: string, id: string, input: StatusSnapshotInput) {
-  validateStatusSnapshotInput(input);
+  // TEMPORARY: remove this diagnostic block once the #441 root cause is found.
+  console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: action entered", { siteId, id });
+  try {
+    validateStatusSnapshotInput(input);
 
-  const supabase = await createClient();
-  await requireSiteAccess(supabase, siteId);
-  await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
+    const supabase = await createClient();
+    await requireSiteAccess(supabase, siteId);
+    await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
 
-  // Content-only update -- status/published_at are deliberately untouched so
-  // saving a Published update's text keeps it Published on the website.
-  const { data, error } = await supabase
-    .from("status_snapshots")
-    .update({
-      headline: input.headline.trim(),
-      body: input.body.trim(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("site_id", siteId)
-    .select("id");
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0) throw new Error("Update did not go through. Nothing was updated.");
+    // Content-only update -- status/published_at are deliberately untouched so
+    // saving a Published update's text keeps it Published on the website.
+    console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: before Supabase update", { siteId, id });
+    const { data, error } = await supabase
+      .from("status_snapshots")
+      .update({
+        headline: input.headline.trim(),
+        body: input.body.trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("site_id", siteId)
+      .select("id");
+    if (error) {
+      console.error("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: Supabase update failed", { siteId, id, errorMessage: error.message });
+      throw new Error(error.message);
+    }
+    console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: Supabase update success", {
+      siteId,
+      id,
+      rowsReturned: data?.length ?? 0,
+      returnedIds: data?.map((r) => r.id) ?? [],
+    });
+    if (!data || data.length === 0) {
+      console.error("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: zero rows updated", { siteId, id });
+      throw new Error("Update did not go through. Nothing was updated.");
+    }
 
-  revalidateContent();
-  await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+    console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: before revalidatePath (revalidateContent)", { siteId, id });
+    revalidateContent();
+
+    console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: before revalidateWebsite", { siteId, id });
+    await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+    console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: after revalidateWebsite", { siteId, id });
+
+    console.log("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: action returning", { siteId, id });
+  } catch (err) {
+    const e = err as (Error & { digest?: string }) | null;
+    console.error("[STATUS_SNAPSHOT_DEBUG] updateStatusSnapshot: caught error", {
+      siteId,
+      id,
+      name: e?.name,
+      message: e?.message,
+      stack: e?.stack,
+      digest: e?.digest,
+    });
+    throw err;
+  }
 }
 
 export async function setStatusSnapshotStatus(siteId: string, id: string, status: "draft" | "published") {

@@ -15,18 +15,54 @@ export default async function EditStatusSnapshotPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<DashboardSearchParams>;
 }) {
+  // TEMPORARY: remove this diagnostic block once the #441 root cause is found.
+  // JSX is deliberately never constructed inside this try -- ESLint's
+  // react-hooks/error-boundaries rule flags that as unsound anyway, since JSX
+  // creation is lazy and a render-phase throw would happen after this
+  // function returns, outside the try. This block only wraps the async data
+  // calls, so it can only catch a throw from context/permission/fetch logic,
+  // not from React actually rendering the returned tree.
+  console.log("[STATUS_SNAPSHOT_DEBUG] page: render entered");
+
   const { id } = await params;
   const searchParamsResolved = await searchParams;
-  const { site } = await resolveDashboardContext(searchParamsResolved);
-  if (!site) return <NoSiteAccess />;
-  requireModule(site, "content_management");
 
-  const supabase = await createClient();
-  if (!(await hasPermission(supabase, site.id, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE))) {
-    return <AccessDenied />;
+  let site: Awaited<ReturnType<typeof resolveDashboardContext>>["site"] = null;
+  let permitted = false;
+  let item: Awaited<ReturnType<typeof getStatusSnapshotById>> = null;
+
+  try {
+    const ctx = await resolveDashboardContext(searchParamsResolved);
+    site = ctx.site;
+    console.log("[STATUS_SNAPSHOT_DEBUG] page: dashboard context resolved", { hasSite: !!site, siteId: site?.id ?? null });
+
+    if (site) {
+      requireModule(site, "content_management");
+
+      const supabase = await createClient();
+      permitted = await hasPermission(supabase, site.id, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
+      console.log("[STATUS_SNAPSHOT_DEBUG] page: permission check passed", { permitted });
+
+      if (permitted) {
+        console.log("[STATUS_SNAPSHOT_DEBUG] page: snapshot fetch started", { id, siteId: site.id });
+        item = await getStatusSnapshotById(supabase, site.id, id);
+        console.log("[STATUS_SNAPSHOT_DEBUG] page: snapshot fetch result", { found: !!item });
+      }
+    }
+  } catch (err) {
+    const e = err as (Error & { digest?: string }) | null;
+    console.error("[STATUS_SNAPSHOT_DEBUG] page: caught error", {
+      name: e?.name,
+      message: e?.message,
+      stack: e?.stack,
+      digest: e?.digest,
+    });
+    throw err;
   }
 
-  const item = await getStatusSnapshotById(supabase, site.id, id);
+  if (!site) return <NoSiteAccess />;
+  if (!permitted) return <AccessDenied />;
+
   const query = dashboardQueryString({ siteId: site.id, range: searchParamsResolved.range, from: searchParamsResolved.from, to: searchParamsResolved.to });
 
   if (!item) {
@@ -40,6 +76,7 @@ export default async function EditStatusSnapshotPage({
     );
   }
 
+  console.log("[STATUS_SNAPSHOT_DEBUG] page: before rendering StatusSnapshotForm");
   return (
     <div dir="rtl" className="space-y-6">
       <div>

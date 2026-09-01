@@ -63,7 +63,7 @@ export function TrafficChart({
       </div>
       <div className={`h-64 transition-opacity ${loading ? "opacity-50" : ""}`}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+          <AreaChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
             <defs>
               <linearGradient id="pulseArea" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.25} />
@@ -72,7 +72,7 @@ export function TrafficChart({
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} allowDecimals={false} width={36} />
+            <YAxis tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} allowDecimals={false} width={44} />
             <Tooltip
               contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}
               labelStyle={{ color: "var(--muted)" }}

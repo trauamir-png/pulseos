@@ -13,6 +13,17 @@ import { DeleteConfirmDialog, DeleteIconButton } from "@/components/content/dele
 import { extractTikTokVideoId } from "@/lib/content/tiktok";
 import type { StandMediaRecord } from "@/lib/dashboard/content-stand-media";
 
+export function getTitleValidationError(title: string): string | null {
+  return title.trim() ? null : "יש להזין כותרת";
+}
+
+export function toFriendlyErrorMessage(e: unknown): string {
+  if (e instanceof Error && e.message && !/error #\d+|server components render|digest/i.test(e.message)) {
+    return e.message;
+  }
+  return "אירעה שגיאה בשמירה. נסו שוב.";
+}
+
 export function StandMediaForm({
   siteId,
   query,
@@ -28,6 +39,7 @@ export function StandMediaForm({
   const [tiktokUrl, setTiktokUrl] = useState(item?.tiktokUrl ?? "");
   const [sortOrder, setSortOrder] = useState(item?.sortOrder ?? 0);
   const [error, setError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [statusPending, startStatusTransition] = useTransition();
@@ -36,6 +48,12 @@ export function StandMediaForm({
 
   function handleSave() {
     setError(null);
+    const titleValidationError = getTitleValidationError(title);
+    if (titleValidationError) {
+      setTitleError(titleValidationError);
+      return;
+    }
+    setTitleError(null);
     const input: StandMediaInput = { title, tiktokUrl, sortOrder };
     startTransition(async () => {
       try {
@@ -44,13 +62,10 @@ export function StandMediaForm({
           router.refresh();
         } else {
           const { id } = await createStandMedia(siteId, input);
-          // TEMPORARY: remove these diagnostic logs once the #441 root cause is found.
-          console.log("[stand-media-441] client: createStandMedia resolved", { id });
-          console.log("[stand-media-441] client: before router.push", { id });
           router.push(`/content/stand-media/${id}${query}`);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to save.");
+        setError(toFriendlyErrorMessage(e));
       }
     });
   }
@@ -77,10 +92,14 @@ export function StandMediaForm({
             <input
               dir="auto"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (titleError) setTitleError(null);
+              }}
               placeholder="Shown publicly on the website"
               className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
             />
+            {titleError && <p className="mt-1.5 text-sm text-[var(--negative)]">{titleError}</p>}
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">TikTok video URL</label>

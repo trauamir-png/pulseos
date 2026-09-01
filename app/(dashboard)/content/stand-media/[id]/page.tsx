@@ -16,8 +16,6 @@ export default async function EditStandMediaPage({
   searchParams: Promise<DashboardSearchParams>;
 }) {
   const { id } = await params;
-  // TEMPORARY: remove this diagnostic log once the #441 root cause is found.
-  console.log("[stand-media-441] page: render entry", { id });
   const searchParamsResolved = await searchParams;
   const { site } = await resolveDashboardContext(searchParamsResolved);
   if (!site) return <NoSiteAccess />;
@@ -29,8 +27,6 @@ export default async function EditStandMediaPage({
   }
 
   const item = await getStandMediaById(supabase, site.id, id);
-  // TEMPORARY: remove this diagnostic log once the #441 root cause is found.
-  console.log("[stand-media-441] page: loader returned", { id, found: !!item });
   const query = dashboardQueryString({ siteId: site.id, range: searchParamsResolved.range, from: searchParamsResolved.from, to: searchParamsResolved.to });
 
   if (!item) {
@@ -44,8 +40,6 @@ export default async function EditStandMediaPage({
     );
   }
 
-  // TEMPORARY: remove this diagnostic log once the #441 root cause is found.
-  console.log("[stand-media-441] page: before rendering form", { id });
   return (
     <div className="space-y-6">
       <div>

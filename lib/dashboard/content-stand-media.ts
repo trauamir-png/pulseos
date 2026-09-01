@@ -42,13 +42,6 @@ export async function getStandMediaForSite(supabase: Supa, siteId: string): Prom
 }
 
 export async function getStandMediaById(supabase: Supa, siteId: string, id: string): Promise<StandMediaRecord | null> {
-  // TEMPORARY: remove this diagnostic block once the #441 root cause is found.
-  console.log("[stand-media-441] getStandMediaById: entry", { siteId, id });
-  const { data, error } = await supabase.from("stand_media").select("*").eq("id", id).eq("site_id", siteId).maybeSingle();
-  if (error) {
-    console.error("[stand-media-441] getStandMediaById: query failed", { siteId, id, errorMessage: error.message });
-  } else {
-    console.log("[stand-media-441] getStandMediaById: query result", { siteId, id, found: !!data });
-  }
+  const { data } = await supabase.from("stand_media").select("*").eq("id", id).eq("site_id", siteId).maybeSingle();
   return data ? toRecord(data) : null;
 }

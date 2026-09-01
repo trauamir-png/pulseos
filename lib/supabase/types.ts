@@ -135,10 +135,12 @@ export interface Database {
       daily_salts: {
         Row: {
           day: string;
+          timezone: string;
           salt: string;
         };
         Insert: {
           day: string;
+          timezone?: string;
           salt?: string;
         };
         Update: Partial<Database["public"]["Tables"]["daily_salts"]["Insert"]>;
@@ -939,6 +941,56 @@ export interface Database {
       accessible_site_ids: {
         Args: Record<string, never>;
         Returns: string[];
+      };
+      get_analytics_summary: {
+        Args: { p_site_id: string; p_from: string; p_to: string };
+        Returns: {
+          visitors: number;
+          sessions: number;
+          pageViews: number;
+          events: number;
+          conversions: number;
+          conversionRate: number;
+        };
+      };
+      get_analytics_timeseries: {
+        Args: { p_site_id: string; p_from: string; p_to: string; p_timezone: string; p_granularity: string; p_metric: string };
+        Returns: { label: string; value: number }[];
+      };
+      get_analytics_sources: {
+        Args: { p_site_id: string; p_from: string; p_to: string };
+        Returns: {
+          source: string;
+          visitors: number;
+          sessions: number;
+          pageViews: number;
+          conversions: number;
+          conversionRate: number;
+        }[];
+      };
+      get_analytics_pages: {
+        Args: { p_site_id: string; p_from: string; p_to: string };
+        Returns: {
+          pathname: string;
+          views: number;
+          uniqueVisitors: number;
+          entrances: number;
+          exits: number;
+          avgEngagementSeconds: number | null;
+        }[];
+      };
+      get_analytics_events: {
+        Args: { p_site_id: string; p_from: string; p_to: string };
+        Returns: { eventName: string; count: number; uniqueVisitors: number; conversions: number }[];
+      };
+      get_analytics_event_detail: {
+        Args: { p_site_id: string; p_event_name: string; p_from: string; p_to: string; p_timezone: string; p_granularity: string };
+        Returns: {
+          timeseries: { label: string; value: number }[];
+          topPages: { pathname: string; count: number }[];
+          topSources: { source: string; count: number }[];
+          recentProperties: { properties: Record<string, unknown>; occurredAt: string }[];
+        };
       };
     };
     Enums: Record<string, never>;

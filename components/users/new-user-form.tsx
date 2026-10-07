@@ -2,20 +2,36 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createOrInviteUser } from "@/app/(dashboard)/users/actions";
+import { createUser } from "@/app/(dashboard)/users/actions";
 import { PermissionChecklist } from "./permission-checklist";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import type { PermissionKey } from "@/lib/auth/permission-definitions";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 export function NewUserForm({ sites }: { sites: SiteRecord[] }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedSiteIds, setSelectedSiteIds] = useState<Set<string>>(new Set());
   const [permissionsBySite, setPermissionsBySite] = useState<Record<string, Set<PermissionKey>>>({});
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ tempPassword: string | null; reusedExistingAccount: boolean; email: string } | null>(null);
+  const [result, setResult] = useState<{ userId: string; email: string } | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function resetForm() {
+    setResult(null);
+    setDisplayName("");
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+    setSelectedSiteIds(new Set());
+    setPermissionsBySite({});
+  }
 
   function toggleSite(siteId: string) {
     setSelectedSiteIds((prev) => {
@@ -33,14 +49,25 @@ export function NewUserForm({ sites }: { sites: SiteRecord[] }) {
       setError("Select at least one site.");
       return;
     }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
     const assignments = [...selectedSiteIds].map((siteId) => ({
       siteId,
       permissions: [...(permissionsBySite[siteId] ?? new Set<PermissionKey>())],
     }));
+    const submittedEmail = email;
     startTransition(async () => {
       try {
-        const res = await createOrInviteUser({ displayName, email, assignments });
-        setResult({ tempPassword: res.tempPassword, reusedExistingAccount: res.reusedExistingAccount, email });
+        const res = await createUser({ displayName, email, password, assignments });
+        setPassword("");
+        setConfirmPassword("");
+        setResult({ userId: res.userId, email: submittedEmail });
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to create user.");
@@ -51,36 +78,20 @@ export function NewUserForm({ sites }: { sites: SiteRecord[] }) {
   if (result) {
     return (
       <div className="space-y-3 rounded-xl border border-green-200 bg-green-50 p-5">
-        <h2 className="text-sm font-semibold text-green-900">User created</h2>
-        {result.reusedExistingAccount ? (
-          <p className="text-sm text-green-800">
-            {result.email} already had a PulseOS login — their existing account was linked to the new site access below. No new
-            password was generated.
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-green-800">
-              Share this temporary password with {result.email} directly — it will not be shown again. They can sign in
-              immediately and should change it afterward.
-            </p>
-            <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm text-[var(--foreground)]">{result.tempPassword}</code>
-          </>
-        )}
+        <h2 className="text-sm font-semibold text-green-900">User created successfully</h2>
+        <p className="text-sm text-green-800">
+          {result.email} can sign in immediately with the email and password you set. That password stays valid until you or
+          they change it later.
+        </p>
         <div className="flex gap-2">
           <button
-            onClick={() => router.push("/users")}
+            onClick={() => router.push(`/users/${result.userId}`)}
             className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
-            Back to Users
+            Go to user
           </button>
           <button
-            onClick={() => {
-              setResult(null);
-              setDisplayName("");
-              setEmail("");
-              setSelectedSiteIds(new Set());
-              setPermissionsBySite({});
-            }}
+            onClick={resetForm}
             className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-gray-50"
           >
             Add another user
@@ -109,6 +120,39 @@ export function NewUserForm({ sites }: { sites: SiteRecord[] }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">Password</label>
+          <input
+            required
+            type={showPassword ? "text" : "password"}
+            minLength={MIN_PASSWORD_LENGTH}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+          />
+        </div>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="block text-sm font-medium text-[var(--foreground)]">Confirm password</label>
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="text-xs font-medium text-[var(--accent)] hover:underline"
+            >
+              {showPassword ? "Hide" : "Show"} password
+            </button>
+          </div>
+          <input
+            required
+            type={showPassword ? "text" : "password"}
+            minLength={MIN_PASSWORD_LENGTH}
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
           />
         </div>

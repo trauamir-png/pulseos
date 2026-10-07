@@ -82,6 +82,7 @@ interface ProfileRow {
   is_admin: boolean;
   created_at: string;
   updated_at: string;
+  must_change_password: boolean;
 }
 
 interface MembershipRow {
@@ -98,10 +99,22 @@ interface AdminState {
   membershipPermissions: Map<string, Set<string>>;
   /** Set by a test to make auth.admin.deleteUser(id) return an error for that one id. */
   failDeleteUserId: string | null;
+  /** Test-only capture of the last auth.admin.createUser() call args, to assert on email_confirm/password without persisting them anywhere real. */
+  lastCreateUserCall: { email: string; password: string; email_confirm: boolean } | null;
+  /** Set by a test to make the next write to this table return an error once, then clear itself. */
+  failNextWriteToTable: string | null;
 }
 
 function newAdminState(): AdminState {
-  return { authUsers: new Map(), profiles: new Map(), memberships: new Map(), membershipPermissions: new Map(), failDeleteUserId: null };
+  return {
+    authUsers: new Map(),
+    profiles: new Map(),
+    memberships: new Map(),
+    membershipPermissions: new Map(),
+    failDeleteUserId: null,
+    lastCreateUserCall: null,
+    failNextWriteToTable: null,
+  };
 }
 
 function seedAdmin(id: string, email: string, overrides: Partial<ProfileRow> = {}) {
@@ -113,6 +126,7 @@ function seedAdmin(id: string, email: string, overrides: Partial<ProfileRow> = {
     is_admin: true,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    must_change_password: false,
     ...overrides,
   });
 }
@@ -150,6 +164,10 @@ function makeAdmin(state: AdminState) {
     }
 
     async function resolve(): Promise<{ data: unknown; error: { message: string } | null; count?: number }> {
+      if (mode !== "select" && state.failNextWriteToTable === table) {
+        state.failNextWriteToTable = null;
+        return { data: null, error: { message: "simulated downstream failure" } };
+      }
       if (mode === "upsert" && table === "profiles") {
         const p = payload as Record<string, unknown>;
         const existing = state.profiles.get(p.id as string);
@@ -160,6 +178,10 @@ function makeAdmin(state: AdminState) {
           is_admin: existing?.is_admin ?? false,
           created_at: existing?.created_at ?? "2026-01-01T00:00:00Z",
           updated_at: "2026-01-01T00:00:00Z",
+          // Mirrors the real upsert: a column absent from the payload keeps its
+          // existing value on UPDATE, or falls back to the table's DB default
+          // (false, 0014_must_change_password.sql) on a fresh INSERT.
+          must_change_password: (p.must_change_password as boolean) ?? existing?.must_change_password ?? false,
         };
         state.profiles.set(row.id, row);
         return { data: row, error: null };
@@ -245,7 +267,8 @@ function makeAdmin(state: AdminState) {
   return {
     auth: {
       admin: {
-        createUser: async ({ email }: { email: string; password: string; email_confirm: boolean }) => {
+        createUser: async ({ email, password, email_confirm }: { email: string; password: string; email_confirm: boolean }) => {
+          state.lastCreateUserCall = { email, password, email_confirm };
           const existing = [...state.authUsers.values()].find((u) => u.email === email);
           if (existing) return { data: { user: null }, error: { message: "A user with this email address has already been registered" } };
           const id = `auth-${state.authUsers.size + 1}`;
@@ -300,20 +323,28 @@ beforeEach(async () => {
   usersLib = await import("@/lib/dashboard/users");
 });
 
-describe("createOrInviteUser", () => {
-  it("creates a brand-new Auth user, profile, membership, and permissions for a manager on their own site", async () => {
+describe("createUser", () => {
+  const PASSWORD = "correct-horse-battery";
+
+  it("creates a new Auth user with the Admin-set password and email_confirm: true, plus profile, membership, and permissions", async () => {
     seedAdmin("actor-1", "manager@example.com", { is_admin: false });
     currentSupabase = makeSupabase(callerState({ permissions: new Set([PERMISSIONS.SITE_USERS_MANAGE]) }));
 
-    const result = await actions.createOrInviteUser({
+    const result = await actions.createUser({
       displayName: "New Writer",
       email: "writer@example.com",
+      password: PASSWORD,
       assignments: [{ siteId: SITE_A, permissions: [PERMISSIONS.CONTENT_COLUMNS_CREATE] }],
     });
 
-    expect(result.reusedExistingAccount).toBe(false);
-    expect(result.tempPassword).toBeTruthy();
-    expect(currentAdminState.profiles.get(result.userId)?.display_name).toBe("New Writer");
+    expect(currentAdminState.lastCreateUserCall).toEqual({ email: "writer@example.com", password: PASSWORD, email_confirm: true });
+    expect(currentAdminState.authUsers.get(result.userId)?.email).toBe("writer@example.com");
+
+    const profile = currentAdminState.profiles.get(result.userId);
+    expect(profile?.display_name).toBe("New Writer");
+    expect(profile?.active).toBe(true);
+    // The Admin-set password is permanent -- no forced change on first login.
+    expect(profile?.must_change_password).toBe(false);
 
     const membership = [...currentAdminState.memberships.values()].find((m) => m.user_id === result.userId && m.site_id === SITE_A);
     expect(membership?.active).toBe(true);
@@ -323,22 +354,58 @@ describe("createOrInviteUser", () => {
     expect(perms?.has(PERMISSIONS.CONTENT_COLUMNS_VIEW)).toBe(true);
   });
 
-  it("reuses an existing Supabase Auth account with the same email instead of creating a duplicate", async () => {
+  it("never returns or logs the password", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await actions.createUser({
+      displayName: "Someone",
+      email: "someone@example.com",
+      password: PASSWORD,
+      assignments: [{ siteId: SITE_A, permissions: [] }],
+    });
+
+    expect(JSON.stringify(result)).not.toContain(PASSWORD);
+    const allLoggedArgs = [...logSpy.mock.calls, ...errorSpy.mock.calls].flat().map((a) => JSON.stringify(a));
+    expect(allLoggedArgs.some((a) => a.includes(PASSWORD))).toBe(false);
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it("rejects an email that already exists in Auth, with a clear message, and creates no duplicate profile", async () => {
     seedAdmin("actor-1", "admin@example.com");
     seedAdmin("existing-user", "existing@example.com", { is_admin: false, display_name: "Existing" });
     currentSupabase = makeSupabase(callerState({ isAdmin: true }));
 
-    const result = await actions.createOrInviteUser({
-      displayName: "Existing Renamed",
-      email: "existing@example.com",
-      assignments: [{ siteId: SITE_A, permissions: [] }],
-    });
+    await expect(
+      actions.createUser({
+        displayName: "Existing Renamed",
+        email: "existing@example.com",
+        password: PASSWORD,
+        assignments: [{ siteId: SITE_A, permissions: [] }],
+      }),
+    ).rejects.toThrow(/already exists/i);
 
-    expect(result.reusedExistingAccount).toBe(true);
-    expect(result.tempPassword).toBeNull();
-    expect(result.userId).toBe("existing-user");
-    expect(currentAdminState.authUsers.size).toBe(2);
-    expect(currentAdminState.profiles.get("existing-user")?.display_name).toBe("Existing Renamed");
+    expect(currentAdminState.authUsers.size).toBe(2); // only the two seeded users -- no new Auth user was created
+    expect(currentAdminState.profiles.get("existing-user")?.display_name).toBe("Existing"); // untouched
+  });
+
+  it("rejects a password shorter than 8 characters without creating any Auth user", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+
+    await expect(
+      actions.createUser({
+        displayName: "Someone",
+        email: "someone@example.com",
+        password: "short1",
+        assignments: [{ siteId: SITE_A, permissions: [] }],
+      }),
+    ).rejects.toThrow(/at least 8 characters/);
+
+    expect(currentAdminState.authUsers.size).toBe(1); // only the seeded actor
   });
 
   it("rejects assigning a site the caller does not manage, and never creates a partial account", async () => {
@@ -346,9 +413,10 @@ describe("createOrInviteUser", () => {
     currentSupabase = makeSupabase(callerState({ permissions: new Set([PERMISSIONS.SITE_USERS_MANAGE]) })); // only manages SITE_A
 
     await expect(
-      actions.createOrInviteUser({
+      actions.createUser({
         displayName: "Someone",
         email: "someone@example.com",
+        password: PASSWORD,
         assignments: [{ siteId: SITE_B, permissions: [] }],
       }),
     ).rejects.toThrow();
@@ -361,9 +429,10 @@ describe("createOrInviteUser", () => {
     currentSupabase = makeSupabase(callerState({ isAdmin: true }));
 
     await expect(
-      actions.createOrInviteUser({
+      actions.createUser({
         displayName: "Someone",
         email: "someone@example.com",
+        password: PASSWORD,
         assignments: [{ siteId: SITE_A, permissions: ["not.a.real.permission"] }],
       }),
     ).rejects.toThrow();
@@ -376,8 +445,46 @@ describe("createOrInviteUser", () => {
     currentSupabase = makeSupabase(callerState({ permissions: new Set() }));
 
     await expect(
-      actions.createOrInviteUser({ displayName: "Someone", email: "someone@example.com", assignments: [{ siteId: SITE_A, permissions: [] }] }),
+      actions.createUser({ displayName: "Someone", email: "someone@example.com", password: PASSWORD, assignments: [{ siteId: SITE_A, permissions: [] }] }),
     ).rejects.toThrow();
+
+    expect(currentAdminState.authUsers.size).toBe(1);
+  });
+
+  it("deletes the newly-created Auth user when a downstream step fails, leaving no orphaned account", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+    currentAdminState.failNextWriteToTable = "site_memberships";
+
+    await expect(
+      actions.createUser({
+        displayName: "Someone",
+        email: "someone@example.com",
+        password: PASSWORD,
+        assignments: [{ siteId: SITE_A, permissions: [] }],
+      }),
+    ).rejects.toThrow(/partially-created account has been removed/);
+
+    // The new Auth user was "auth-2" (actor-1 is "auth-1"-shaped but seeded under its own id) -- assert by scanning for the email instead of guessing the id.
+    const orphan = [...currentAdminState.authUsers.values()].find((u) => u.email === "someone@example.com");
+    expect(orphan).toBeUndefined();
+    expect([...currentAdminState.profiles.values()].some((p) => p.display_name === "Someone")).toBe(false);
+  });
+
+  it("surfaces the cleanup failure if the rollback delete itself fails, instead of silently losing the orphan", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+    currentAdminState.failNextWriteToTable = "site_memberships";
+    currentAdminState.failDeleteUserId = "auth-2";
+
+    await expect(
+      actions.createUser({
+        displayName: "Someone",
+        email: "someone@example.com",
+        password: PASSWORD,
+        assignments: [{ siteId: SITE_A, permissions: [] }],
+      }),
+    ).rejects.toThrow(/could not be cleaned up automatically/);
   });
 });
 

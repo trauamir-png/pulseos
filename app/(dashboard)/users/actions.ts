@@ -1,6 +1,5 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPermissionKey } from "@/lib/auth/permission-definitions";
@@ -12,11 +11,6 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 export interface SiteAssignmentInput {
   siteId: string;
   permissions: string[];
-}
-
-function generateTempPassword(): string {
-  // 16 URL-safe characters -- shown once to the Admin/manager to relay manually (see Phase 3 report, invite-flow decision).
-  return randomBytes(12).toString("base64url");
 }
 
 async function findAuthUserByEmail(admin: AdminClient, email: string) {
@@ -63,32 +57,44 @@ function validatePermissionKeys(keys: string[]): void {
   }
 }
 
+function isDuplicateEmailMessage(message: string): boolean {
+  return /already (been )?registered|already exists/i.test(message);
+}
+
 /**
- * Creates a new PulseOS user (or reuses an existing Supabase Auth account
- * with the same email) and assigns site access + permissions.
+ * Creates a new PulseOS user with a password the Admin sets directly, and
+ * assigns site access + permissions. Rejects an email that already exists in
+ * Supabase Auth instead of reusing that account -- to grant an existing user
+ * access to another site, use their own user page instead.
  *
- * No Supabase invite-email flow: this app has no password-set/callback page
- * today, and configuring one requires a Supabase Dashboard change outside
- * this repo (see the Phase 3 report). V1 instead creates the Auth user with
- * an Admin-relayed temporary password, returned once here and never stored.
+ * The Auth user is created first, with email_confirm: true so no Supabase
+ * invite email is sent and the user can sign in with the given email +
+ * password immediately. If any step after that (profile, membership, or
+ * permissions) fails, the newly-created Auth user is deleted again so no
+ * orphaned account is left behind -- this repo has no real transaction
+ * spanning auth.users and these app tables, so an explicit rollback is the
+ * only way to avoid that.
  *
- * Multi-step (Auth user -> profile -> membership -> permissions) with no
- * real transaction available for the last three tables. Every step after
- * Auth-user creation is an idempotent upsert/replace, so if this throws
- * partway through, re-submitting the same form (same email) safely resumes
- * rather than duplicating or corrupting state.
+ * The Admin-set password is permanent, not temporary: profiles.must_change_password
+ * is deliberately left unset (defaults to false, 0014_must_change_password.sql),
+ * so the new user is never redirected to /change-password on first login --
+ * they sign in and stay signed in with the password the Admin gave them,
+ * until they or an Admin change it later.
  */
-export async function createOrInviteUser(input: {
+export async function createUser(input: {
   displayName: string;
   email: string;
+  password: string;
   assignments: SiteAssignmentInput[];
-}): Promise<{ userId: string; tempPassword: string | null; reusedExistingAccount: boolean }> {
+}): Promise<{ userId: string }> {
   const actor = await getActorContext();
 
   const displayName = input.displayName.trim();
   const email = input.email.trim().toLowerCase();
+  const password = input.password;
   if (!displayName) throw new Error("Name is required.");
   if (!email || !email.includes("@")) throw new Error("A valid email is required.");
+  if (!password || password.length < 8) throw new Error("Password must be at least 8 characters.");
   if (input.assignments.length === 0) throw new Error("Select at least one site.");
 
   const manageable = new Set((await listManageableSites(actor)).map((s) => s.id));
@@ -101,49 +107,37 @@ export async function createOrInviteUser(input: {
 
   const admin = createAdminClient();
 
-  let userId: string;
-  let tempPassword: string | null = null;
-  let reusedExistingAccount = false;
+  const existing = await findAuthUserByEmail(admin, email);
+  if (existing) throw new Error("User with this email already exists");
 
-  const candidatePassword = generateTempPassword();
-  const created = await admin.auth.admin.createUser({ email, password: candidatePassword, email_confirm: true });
+  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (created.error || !created.data.user) {
-    const existing = await findAuthUserByEmail(admin, email);
-    if (!existing) {
-      throw new Error(`Could not create user: ${created.error?.message ?? "unknown error"}`);
+    const message = created.error?.message ?? "unknown error";
+    if (isDuplicateEmailMessage(message)) throw new Error("User with this email already exists");
+    throw new Error(`Could not create user: ${message}`);
+  }
+  const userId = created.data.user.id;
+
+  try {
+    const { error: profileError } = await admin
+      .from("profiles")
+      .upsert({ id: userId, display_name: displayName, active: true }, { onConflict: "id" });
+    if (profileError) throw new Error(`Saving the profile failed: ${profileError.message}`);
+
+    for (const assignment of input.assignments) {
+      await upsertSiteAssignment(admin, userId, assignment.siteId, assignment.permissions);
     }
-    userId = existing.id;
-    reusedExistingAccount = true;
-  } else {
-    userId = created.data.user.id;
-    tempPassword = candidatePassword;
-  }
-
-  // must_change_password is only ever set true here, for a genuinely new Auth
-  // user still on the generated temp password. When reusedExistingAccount is
-  // true, the field is omitted entirely -- upsert's ON CONFLICT DO UPDATE
-  // only touches columns present in the payload, so an already-onboarded
-  // user being assigned to another site keeps their existing flag untouched.
-  const profilePayload: { id: string; display_name: string; active: boolean; must_change_password?: boolean } = {
-    id: userId,
-    display_name: displayName,
-    active: true,
-  };
-  if (!reusedExistingAccount) {
-    profilePayload.must_change_password = true;
-  }
-
-  const { error: profileError } = await admin.from("profiles").upsert(profilePayload, { onConflict: "id" });
-  if (profileError) {
-    throw new Error(`User account ready, but saving the profile failed: ${profileError.message}. Re-submitting this form is safe and will resume.`);
-  }
-
-  for (const assignment of input.assignments) {
-    await upsertSiteAssignment(admin, userId, assignment.siteId, assignment.permissions);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "unknown error";
+    const { error: cleanupError } = await admin.auth.admin.deleteUser(userId);
+    if (cleanupError) {
+      throw new Error(`${reason} The partially-created account (id ${userId}) could not be cleaned up automatically -- please delete it manually.`);
+    }
+    throw new Error(`${reason} The partially-created account has been removed; please try again.`);
   }
 
   revalidatePath("/users");
-  return { userId, tempPassword, reusedExistingAccount };
+  return { userId };
 }
 
 /** Add (or reactivate) one site assignment for an existing user, with its own permission set. */

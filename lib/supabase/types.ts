@@ -899,6 +899,66 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["match_fan_votes"]["Insert"]>;
         Relationships: [];
       };
+      starting_xi_snapshots: {
+        Row: {
+          id: string;
+          site_id: string;
+          external_fixture_id: string;
+          opponent_name: string;
+          kickoff_at: string;
+          lock_at: string;
+          voting_status: "open" | "closed" | "unavailable";
+          total_submissions: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          external_fixture_id: string;
+          opponent_name: string;
+          kickoff_at: string;
+          lock_at: string;
+          voting_status?: "open" | "closed" | "unavailable";
+          total_submissions?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["starting_xi_snapshots"]["Insert"]>;
+        Relationships: [];
+      };
+      starting_xi_player_results: {
+        Row: {
+          id: string;
+          snapshot_id: string;
+          player_id: string;
+          name: string;
+          shirt_number: number | null;
+          position: string | null;
+          image_url: string | null;
+          selection_count: number;
+          selection_percentage: number;
+          is_current_squad: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          snapshot_id: string;
+          player_id: string;
+          name: string;
+          shirt_number?: number | null;
+          position?: string | null;
+          image_url?: string | null;
+          selection_count?: number;
+          selection_percentage?: number;
+          is_current_squad?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["starting_xi_player_results"]["Insert"]>;
+        Relationships: [];
+      };
       telegram_processed_messages: {
         Row: {
           telegram_chat_id: number;

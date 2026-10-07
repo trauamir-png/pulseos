@@ -24,6 +24,7 @@ import {
   Vote,
   Activity,
   Clapperboard,
+  Shirt,
   X,
 } from "lucide-react";
 import type { SiteRecord } from "@/lib/dashboard/site";
@@ -51,6 +52,7 @@ export const CONTENT_ITEMS = [
   { href: "/content/field-videos", label: "סרטונים מהשטח", icon: Clapperboard, permission: PERMISSIONS.CONTENT_FIELD_VIDEOS_VIEW },
   { href: "/content/match-panel-picks", label: "Panel Picks", icon: Trophy, permission: PERMISSIONS.CONTENT_MATCH_PANEL_PICKS_VIEW },
   { href: "/content/match-fan-voting", label: "Fan Match Voting", icon: Vote, permission: PERMISSIONS.CONTENT_MATCH_VOTING_VIEW },
+  { href: "/content/starting-xi", label: "בחירת ה-11", icon: Shirt, permission: PERMISSIONS.CONTENT_STARTING_XI_VIEW },
   { href: "/content/status-snapshot", label: "תמונת מצב", icon: Activity, permission: PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_VIEW },
   { href: "/content/media", label: "Media", icon: ImageIcon, permission: PERMISSIONS.CONTENT_MEDIA_MANAGE },
   { href: "/content/authors", label: "Authors", icon: Users, permission: PERMISSIONS.CONTENT_AUTHORS_MANAGE },

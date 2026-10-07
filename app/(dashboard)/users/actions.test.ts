@@ -96,10 +96,12 @@ interface AdminState {
   profiles: Map<string, ProfileRow>;
   memberships: Map<string, MembershipRow>;
   membershipPermissions: Map<string, Set<string>>;
+  /** Set by a test to make auth.admin.deleteUser(id) return an error for that one id. */
+  failDeleteUserId: string | null;
 }
 
 function newAdminState(): AdminState {
-  return { authUsers: new Map(), profiles: new Map(), memberships: new Map(), membershipPermissions: new Map() };
+  return { authUsers: new Map(), profiles: new Map(), memberships: new Map(), membershipPermissions: new Map(), failDeleteUserId: null };
 }
 
 function seedAdmin(id: string, email: string, overrides: Partial<ProfileRow> = {}) {
@@ -252,6 +254,27 @@ function makeAdmin(state: AdminState) {
           return { data: { user }, error: null };
         },
         listUsers: async () => ({ data: { users: [...state.authUsers.values()] }, error: null }),
+        /**
+         * Simulates the real FK cascade (auth.users -> profiles -> site_memberships
+         * -> membership_permissions, all ON DELETE CASCADE) that fires inside
+         * Postgres when GoTrue hard-deletes the auth.users row -- the production
+         * code never deletes these rows itself. `state.failDeleteUserId` lets a
+         * test force the Admin API error branch without touching any data.
+         */
+        deleteUser: async (id: string) => {
+          if (state.failDeleteUserId === id) {
+            return { data: null, error: { message: "simulated Admin API failure" } };
+          }
+          state.authUsers.delete(id);
+          state.profiles.delete(id);
+          for (const [mid, m] of [...state.memberships]) {
+            if (m.user_id === id) {
+              state.memberships.delete(mid);
+              state.membershipPermissions.delete(mid);
+            }
+          }
+          return { data: {}, error: null };
+        },
       },
     },
     from: (table: string) => builder(table),
@@ -426,6 +449,103 @@ describe("setUserActive -- last-Admin safeguard", () => {
 
     await expect(actions.setUserActive("target", false)).rejects.toThrow();
     expect(currentAdminState.profiles.get("target")?.active).toBe(true);
+  });
+});
+
+describe("deleteUser", () => {
+  it("an Admin can permanently delete another user: Auth user, profile, memberships, and permissions are all gone", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+    seedAdmin("target", "target@example.com", { is_admin: false });
+    seedMembership("m-a", SITE_A, "target", [PERMISSIONS.CONTENT_COLUMNS_VIEW]);
+    seedMembership("m-b", SITE_B, "target", [PERMISSIONS.PODCAST_OVERVIEW_VIEW]);
+
+    await actions.deleteUser("target");
+
+    expect(currentAdminState.authUsers.has("target")).toBe(false);
+    expect(currentAdminState.profiles.has("target")).toBe(false);
+    expect(currentAdminState.memberships.has("m-a")).toBe(false);
+    expect(currentAdminState.memberships.has("m-b")).toBe(false);
+    expect(currentAdminState.membershipPermissions.has("m-a")).toBe(false);
+    expect(currentAdminState.membershipPermissions.has("m-b")).toBe(false);
+  });
+
+  it("another user's access and Auth account are untouched by an unrelated delete", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+    seedAdmin("target", "target@example.com", { is_admin: false });
+    seedAdmin("bystander", "bystander@example.com", { is_admin: false });
+    seedMembership("m-target", SITE_A, "target", []);
+    seedMembership("m-bystander", SITE_A, "bystander", [PERMISSIONS.CONTENT_COLUMNS_VIEW]);
+
+    await actions.deleteUser("target");
+
+    expect(currentAdminState.authUsers.has("bystander")).toBe(true);
+    expect(currentAdminState.profiles.has("bystander")).toBe(true);
+    expect(currentAdminState.memberships.get("m-bystander")?.user_id).toBe("bystander");
+    expect([...(currentAdminState.membershipPermissions.get("m-bystander") ?? [])]).toEqual([PERMISSIONS.CONTENT_COLUMNS_VIEW]);
+  });
+
+  it("refuses self-delete even for an Admin", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+
+    await expect(actions.deleteUser("actor-1")).rejects.toThrow(/own account/);
+    expect(currentAdminState.authUsers.has("actor-1")).toBe(true);
+  });
+
+  it("is Admin-only -- a site-scoped manager cannot delete any user", async () => {
+    seedAdmin("actor-1", "manager@example.com", { is_admin: false });
+    seedAdmin("target", "target@example.com", { is_admin: false });
+    seedMembership("m-a", SITE_A, "target", []);
+    currentSupabase = makeSupabase(callerState({ permissions: new Set([PERMISSIONS.SITE_USERS_MANAGE]) }));
+
+    await expect(actions.deleteUser("target")).rejects.toThrow();
+    expect(currentAdminState.authUsers.has("target")).toBe(true);
+    expect(currentAdminState.memberships.has("m-a")).toBe(true);
+  });
+
+  it("refuses to delete the only active Admin account", async () => {
+    seedAdmin("actor-1", "only-admin@example.com", { is_admin: true, active: true });
+    // A second, Admin-in-session-but-inactive-in-profile account, so deleteUser is called by
+    // someone other than the target (self-delete is a separate guard) while actor-1 remains
+    // the sole *active* Admin -- exactly the case the last-Admin guard exists to catch.
+    seedAdmin("actor-2", "actor2@example.com", { is_admin: true, active: false });
+    currentSupabase = makeSupabase(callerState({ userId: "actor-2", isAdmin: true }));
+
+    await expect(actions.deleteUser("actor-1")).rejects.toThrow(/last active Admin/);
+    expect(currentAdminState.authUsers.has("actor-1")).toBe(true);
+  });
+
+  it("allows deleting an Admin when another active Admin still exists", async () => {
+    seedAdmin("actor-1", "admin-one@example.com", { is_admin: true, active: true });
+    seedAdmin("actor-2", "admin-two@example.com", { is_admin: true, active: true });
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+
+    await actions.deleteUser("actor-2");
+    expect(currentAdminState.authUsers.has("actor-2")).toBe(false);
+  });
+
+  it("does not report success when the Admin API delete fails, and leaves the user's access untouched", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+    seedAdmin("target", "target@example.com", { is_admin: false });
+    seedMembership("m-a", SITE_A, "target", [PERMISSIONS.CONTENT_COLUMNS_VIEW]);
+    currentAdminState.failDeleteUserId = "target";
+
+    await expect(actions.deleteUser("target")).rejects.toThrow(/has not been deleted/);
+
+    expect(currentAdminState.authUsers.has("target")).toBe(true);
+    expect(currentAdminState.profiles.has("target")).toBe(true);
+    expect(currentAdminState.memberships.has("m-a")).toBe(true);
+    expect([...(currentAdminState.membershipPermissions.get("m-a") ?? [])]).toEqual([PERMISSIONS.CONTENT_COLUMNS_VIEW]);
+  });
+
+  it("rejects deleting a user that does not exist, without calling the Admin API", async () => {
+    seedAdmin("actor-1", "admin@example.com");
+    currentSupabase = makeSupabase(callerState({ isAdmin: true }));
+
+    await expect(actions.deleteUser("nobody")).rejects.toThrow(/not found/);
   });
 });
 

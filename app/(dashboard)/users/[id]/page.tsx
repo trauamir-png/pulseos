@@ -1,5 +1,5 @@
 import { AccessDenied } from "@/components/access-denied";
-import { ProfilePanel, SiteMembershipCard, AddSiteForm } from "@/components/users/edit-user-ui";
+import { ProfilePanel, SiteMembershipCard, AddSiteForm, DeleteUserSection } from "@/components/users/edit-user-ui";
 import { getActorContext, getUserDetail, listManageableSites, UsersAccessError } from "@/lib/dashboard/users";
 import { formatDate } from "@/lib/format/datetime";
 
@@ -59,6 +59,8 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
         ))}
         <AddSiteForm userId={user.id} availableSites={availableSites} />
       </div>
+
+      {actor.isAdmin && <DeleteUserSection userId={user.id} displayName={user.displayName} isSelf={actor.actorId === user.id} />}
     </div>
   );
 }

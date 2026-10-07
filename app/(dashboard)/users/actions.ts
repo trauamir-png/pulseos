@@ -239,6 +239,55 @@ export async function updateUserTelegramId(userId: string, telegramUserId: numbe
 }
 
 /**
+ * Admin-only, permanent. Deletes the Supabase Auth user via the service-role
+ * client -- the one operation point 4 of the spec requires to happen
+ * server-side with the Admin API. Everything else "deleted" by this action
+ * (profile, site_memberships, membership_permissions) is NOT deleted here
+ * explicitly: it cascades from the auth.users row inside the same Postgres
+ * transaction as the deleteUser call, via the existing FK chain --
+ * profiles.id -> auth.users (cascade, 0012), site_memberships.user_id ->
+ * profiles (cascade, 0012), membership_permissions.membership_id ->
+ * site_memberships (cascade, 0012). That single atomic cascade is also this
+ * action's failure-safety story: there is no separate multi-step cleanup
+ * that could half-complete, so either the whole delete+cascade commits or
+ * nothing does.
+ *
+ * Content is untouched by design, not by omission: columns/match_panel_picks/
+ * status_snapshots/match_fan_voting's created_by all already point at
+ * profiles with ON DELETE SET NULL (0012/0019/0020/0022), and
+ * chat_messages.sender_id was converted from CASCADE to SET NULL in
+ * 0027_chat_messages_sender_set_null.sql specifically so this action could
+ * exist without silently wiping a deleted user's chat history. Column
+ * bylines (columns.author_id) point at the separate `authors` table, never
+ * at profiles, so they're untouched regardless.
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  const actor = await getActorContext();
+  if (!actor.isAdmin) throw new UsersAccessError("Only an Admin can delete a user.");
+  if (actor.actorId === userId) throw new Error("You cannot delete your own account.");
+
+  const admin = createAdminClient();
+
+  const { data: target } = await admin.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
+  if (!target) throw new Error("User not found.");
+
+  if (target.is_admin) {
+    const { count } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("is_admin", true).eq("active", true);
+    if ((count ?? 0) <= 1) {
+      throw new Error("Cannot delete the last active Admin account.");
+    }
+  }
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) {
+    throw new Error(`Failed to delete user: ${error.message}. The user has not been deleted -- please retry.`);
+  }
+
+  revalidatePath("/users");
+  revalidatePath(`/users/${userId}`);
+}
+
+/**
  * Admin-only. Disabling denies authorization everywhere (profiles.active
  * gates is_admin/has_permission at the database layer) without deleting the
  * Auth user, memberships, or any columns.created_by history. Refuses to

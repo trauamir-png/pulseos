@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import {
   addSiteAssignment,
+  deleteUser,
   removeSiteAssignment,
   setSiteMembershipPermissions,
   setUserActive,
@@ -13,6 +14,7 @@ import {
 } from "@/app/(dashboard)/users/actions";
 import { PermissionChecklist } from "./permission-checklist";
 import { AvatarManager } from "@/components/account/avatar-manager";
+import { DeleteConfirmDialog } from "@/components/content/delete-confirm-dialog";
 import type { SiteRecord } from "@/lib/dashboard/site";
 import type { PermissionKey } from "@/lib/auth/permission-definitions";
 
@@ -316,6 +318,50 @@ export function AddSiteForm({ userId, availableSites }: { userId: string; availa
           Cancel
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Permanent, Admin-only. Hidden entirely for the signed-in Admin's own row
+ * (self-delete is blocked server-side too -- see deleteUser) so there is no
+ * dead-end confirmation flow. The dialog's required type-to-confirm text is
+ * the literal word "DELETE", not the username, since a display name isn't
+ * guaranteed unique and typing it adds no real confirmation value here.
+ */
+export function DeleteUserSection({ userId, displayName, isSelf }: { userId: string; displayName: string; isSelf: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  if (isSelf) return null;
+
+  return (
+    <div className="space-y-3 rounded-xl border border-[var(--negative)]/30 bg-[var(--surface)] p-5">
+      <div>
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Delete user</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Permanently deletes {displayName}&apos;s account and sign-in. Content they created or edited is not deleted.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-lg border border-[var(--negative)] px-3 py-2 text-sm font-medium text-[var(--negative)] transition hover:bg-[var(--negative)]/5"
+      >
+        Delete user
+      </button>
+      {open && (
+        <DeleteConfirmDialog
+          entityLabel="user"
+          confirmText="DELETE"
+          description="The user will lose access permanently. Existing content will not be deleted."
+          onConfirm={async () => {
+            await deleteUser(userId);
+            router.push("/users");
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </div>
   );
 }

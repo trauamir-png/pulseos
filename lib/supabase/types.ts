@@ -695,7 +695,7 @@ export interface Database {
         Row: {
           id: string;
           site_id: string;
-          sender_id: string;
+          sender_id: string | null;
           body: string;
           created_at: string;
         };

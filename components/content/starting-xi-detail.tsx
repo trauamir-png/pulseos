@@ -1,16 +1,16 @@
 import Image from "next/image";
 import type { StartingXiSnapshotRecord } from "@/lib/dashboard/content-starting-xi";
-import type { StartingXiPlayerResult } from "@/lib/content/starting-xi-results";
-import { computeFansXi, sortStartingXiPlayers } from "@/lib/content/starting-xi-results";
+import type { StartingXiPlayerResult, StartingXiVotingStatus } from "@/lib/content/starting-xi-results";
+import { computeFansXi, getEffectiveStartingXiStatus, sortStartingXiPlayers } from "@/lib/content/starting-xi-results";
 import { formatDateTime } from "@/lib/format/datetime";
 
-const STATUS_STYLES: Record<StartingXiSnapshotRecord["votingStatus"], string> = {
+const STATUS_STYLES: Record<StartingXiVotingStatus, string> = {
   open: "bg-green-50 text-green-700",
   closed: "bg-blue-50 text-blue-700",
   unavailable: "bg-gray-100 text-[var(--muted)]",
 };
 
-const STATUS_LABELS: Record<StartingXiSnapshotRecord["votingStatus"], string> = {
+const STATUS_LABELS: Record<StartingXiVotingStatus, string> = {
   open: "Open",
   closed: "Closed",
   unavailable: "Unavailable",
@@ -80,6 +80,7 @@ export function StartingXiDetail({
   const notInSquad = sortStartingXiPlayers(players.filter((p) => !p.isCurrentSquad));
   const fansXi = computeFansXi(players);
   const noSubmissionsYet = snapshot.totalSubmissions === 0;
+  const effectiveStatus = getEffectiveStartingXiStatus(snapshot.votingStatus, snapshot.lockAt, new Date());
 
   return (
     <div className="space-y-6">
@@ -96,8 +97,8 @@ export function StartingXiDetail({
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Status</dt>
             <dd className="mt-1">
-              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[snapshot.votingStatus]}`}>
-                {STATUS_LABELS[snapshot.votingStatus]}
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[effectiveStatus]}`}>
+                {STATUS_LABELS[effectiveStatus]}
               </span>
             </dd>
           </div>

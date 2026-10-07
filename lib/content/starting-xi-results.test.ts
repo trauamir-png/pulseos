@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFansXi, sortStartingXiPlayers, type StartingXiPlayerResult } from "./starting-xi-results";
+import { computeFansXi, getEffectiveStartingXiStatus, sortStartingXiPlayers, type StartingXiPlayerResult } from "./starting-xi-results";
 
 function player(overrides: Partial<StartingXiPlayerResult> = {}): StartingXiPlayerResult {
   return {
@@ -59,5 +59,40 @@ describe("computeFansXi", () => {
   it("returns fewer than 11 when the current squad has fewer eligible players", () => {
     const players = [player({ playerId: "a" }), player({ playerId: "b" })];
     expect(computeFansXi(players)).toHaveLength(2);
+  });
+});
+
+describe("getEffectiveStartingXiStatus", () => {
+  const lockAt = "2026-10-10T17:00:00Z";
+
+  it("stays open when stored open and now is before lock_at", () => {
+    const now = new Date("2026-10-10T16:59:59Z");
+    expect(getEffectiveStartingXiStatus("open", lockAt, now)).toBe("open");
+  });
+
+  it("flips to closed when stored open and now is exactly lock_at", () => {
+    const now = new Date("2026-10-10T17:00:00Z");
+    expect(getEffectiveStartingXiStatus("open", lockAt, now)).toBe("closed");
+  });
+
+  it("flips to closed when stored open and now is after lock_at", () => {
+    const now = new Date("2026-10-10T18:00:00Z");
+    expect(getEffectiveStartingXiStatus("open", lockAt, now)).toBe("closed");
+  });
+
+  it("stays closed when stored closed, regardless of now", () => {
+    expect(getEffectiveStartingXiStatus("closed", lockAt, new Date("2026-10-10T10:00:00Z"))).toBe("closed");
+    expect(getEffectiveStartingXiStatus("closed", lockAt, new Date("2026-10-10T20:00:00Z"))).toBe("closed");
+  });
+
+  it("stays unavailable regardless of lock_at or now", () => {
+    expect(getEffectiveStartingXiStatus("unavailable", lockAt, new Date("2000-01-01T00:00:00Z"))).toBe("unavailable");
+    expect(getEffectiveStartingXiStatus("unavailable", lockAt, new Date("2099-01-01T00:00:00Z"))).toBe("unavailable");
+  });
+
+  it("compares absolute instants, not the local browser/server timezone -- the same instant written with a different UTC offset yields the same result", () => {
+    // 17:00:00Z and 20:00:00+03:00 are the same instant.
+    const sameInstantDifferentOffset = new Date("2026-10-10T20:00:00+03:00");
+    expect(getEffectiveStartingXiStatus("open", lockAt, sameInstantDifferentOffset)).toBe("closed");
   });
 });

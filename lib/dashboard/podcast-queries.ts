@@ -3,7 +3,7 @@ import { eachDayOfInterval, eachHourOfInterval } from "date-fns";
 import { toZonedTime, fromZonedTime, format } from "date-fns-tz";
 import type { Database } from "@/lib/supabase/types";
 import { getEpisodesForSite, type EpisodeMeta } from "@/lib/dashboard/podcast";
-import { LISTEN_START_EVENT, PROGRESS_MILESTONES, OUTBOUND_CLICK_EVENTS } from "@/lib/analytics/podcast-events";
+import { LISTEN_START_EVENT, PROGRESS_MILESTONES, OUTBOUND_CLICK_EVENTS, WEB_LISTENER_EVENT } from "@/lib/analytics/podcast-events";
 
 type Supa = SupabaseClient<Database>;
 
@@ -293,6 +293,36 @@ export async function getPodcastSourcesBreakdown(supabase: Supa, siteId: string,
       };
     })
     .sort((a, b) => b.listenStarts - a.listenStarts);
+}
+
+/**
+ * Distinct web listeners per episode (WEB_LISTENER_EVENT only -- >=30s of
+ * real accumulated playback, not just a play start). Backs the "מאזינים
+ * באתר" column on the Episodes list. Dedup is by visitor_hash, which is a
+ * daily-salted IP+UA hash: it resets every day (a listener returning
+ * tomorrow counts again) and can under-count distinct people who share an
+ * IP+UA (e.g. the same device fingerprint behind shared Wi-Fi/NAT).
+ */
+export async function getWebListenerCounts(supabase: Supa, siteId: string, from: Date, to: Date): Promise<Map<string, number>> {
+  const { data } = await supabase
+    .from("podcast_events")
+    .select("episode_id, visitor_hash")
+    .eq("site_id", siteId)
+    .eq("event_name", WEB_LISTENER_EVENT)
+    .gte("occurred_at", from.toISOString())
+    .lte("occurred_at", to.toISOString())
+    .not("episode_id", "is", null)
+    .limit(100000);
+
+  const byEpisode = new Map<string, Set<string>>();
+  for (const row of data ?? []) {
+    if (!row.episode_id) continue;
+    const set = byEpisode.get(row.episode_id) ?? new Set<string>();
+    set.add(row.visitor_hash);
+    byEpisode.set(row.episode_id, set);
+  }
+
+  return new Map(Array.from(byEpisode.entries()).map(([episodeId, visitors]) => [episodeId, visitors.size]));
 }
 
 export interface EpisodeListRow extends EpisodeMeta {

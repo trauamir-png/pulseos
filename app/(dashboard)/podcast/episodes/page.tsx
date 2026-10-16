@@ -5,6 +5,7 @@ import { resolveDashboardContext, dashboardQueryString, type DashboardSearchPara
 import { requireModule } from "@/lib/dashboard/modules";
 import { getEpisodesForSite, getPodcastsForSite } from "@/lib/dashboard/podcast";
 import { getPodbeanEpisodesMetrics, getPodbeanFinalizedThroughForEpisodes } from "@/lib/dashboard/podbean-queries";
+import { getWebListenerCounts } from "@/lib/dashboard/podcast-queries";
 import { EpisodesSearch } from "@/components/episodes-search";
 import { AccessDenied, NoSiteAccess } from "@/components/access-denied";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -40,12 +41,13 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
   const podbeanPodcastIds = podcasts.filter((p) => p.hostingProvider === "podbean").map((p) => p.id);
   const hasPodbean = podbeanPodcastIds.length > 0;
 
-  const [podbeanMetrics, finalizedThrough] = await Promise.all([
+  const [podbeanMetrics, finalizedThrough, webListeners] = await Promise.all([
     getPodbeanEpisodesMetrics(supabase, podbeanPodcastIds),
     getPodbeanFinalizedThroughForEpisodes(supabase, podbeanPodcastIds),
+    getWebListenerCounts(supabase, site.id, range.from, range.to),
   ]);
   const detailQuery = dashboardQueryString({ siteId: site.id, range: params.range, from: params.from, to: params.to });
-  const columnCount = hasPodbean ? 10 : 5;
+  const columnCount = hasPodbean ? 11 : 6;
 
   return (
     <div className="space-y-6">
@@ -81,6 +83,7 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
               <th className="px-4 py-3">Title</th>
               <th className="px-4 py-3">Published</th>
               <th className="px-4 py-3">Duration</th>
+              <th className="px-4 py-3">מאזינים באתר</th>
               {hasPodbean && (
                 <>
                   <th className="px-4 py-3">Podbean Downloads</th>
@@ -122,6 +125,7 @@ export default async function PodcastEpisodesPage({ searchParams }: { searchPara
                       {ep.publishedAt ? format(new Date(ep.publishedAt), "MMM d, yyyy", { timeZone: range.timezone }) : "–"}
                     </td>
                     <td className="px-4 py-3 text-[var(--foreground)]">{formatSeconds(ep.durationSeconds)}</td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{(webListeners.get(ep.id) ?? 0).toLocaleString()}</td>
                     {hasPodbean && (
                       <>
                         <td className="px-4 py-3 text-[var(--foreground)]">{pb ? pb.downloadsAllTime.toLocaleString() : "–"}</td>

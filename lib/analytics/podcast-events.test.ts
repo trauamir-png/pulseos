@@ -3,12 +3,13 @@ import {
   LISTEN_START_EVENT,
   PROGRESS_MILESTONES,
   OUTBOUND_CLICK_EVENTS,
+  WEB_LISTENER_EVENT,
   PODCAST_EVENT_NAMES,
 } from "@/lib/analytics/podcast-events";
 
 describe("podcast event allowlist", () => {
-  it("contains exactly the five listen/milestone events plus three outbound-click events", () => {
-    expect(PODCAST_EVENT_NAMES.size).toBe(8);
+  it("contains exactly the five listen/milestone events, three outbound-click events, and the web-listener event", () => {
+    expect(PODCAST_EVENT_NAMES.size).toBe(9);
     expect(PODCAST_EVENT_NAMES).toEqual(
       new Set([
         "podcast_play",
@@ -19,12 +20,17 @@ describe("podcast event allowlist", () => {
         "spotify_click",
         "apple_podcasts_click",
         "youtube_click",
+        "podcast_listen_30s",
       ])
     );
   });
 
   it("includes the listen-start event", () => {
     expect(PODCAST_EVENT_NAMES.has(LISTEN_START_EVENT)).toBe(true);
+  });
+
+  it("includes the web-listener event", () => {
+    expect(PODCAST_EVENT_NAMES.has(WEB_LISTENER_EVENT)).toBe(true);
   });
 
   it("includes every progress milestone key", () => {

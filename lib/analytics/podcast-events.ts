@@ -19,8 +19,18 @@ export const OUTBOUND_CLICK_EVENTS: Record<string, string> = {
   youtube_click: "YouTube",
 };
 
+/**
+ * Fired once per player session after >=30s of *actual* accumulated
+ * playback (wall-clock time while genuinely playing -- paused and seeked-
+ * over time don't count). This is a stricter, separate notion of "listener"
+ * than LISTEN_START_EVENT (which fires immediately on play) -- it's what
+ * backs the "מאזינים באתר" column, not the general listen funnel.
+ */
+export const WEB_LISTENER_EVENT = "podcast_listen_30s";
+
 export const PODCAST_EVENT_NAMES: ReadonlySet<string> = new Set([
   LISTEN_START_EVENT,
   ...Object.keys(PROGRESS_MILESTONES),
   ...Object.keys(OUTBOUND_CLICK_EVENTS),
+  WEB_LISTENER_EVENT,
 ]);

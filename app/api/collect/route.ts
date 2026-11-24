@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "0.0.0.0";
-  const salt = await getDailySalt(supabase);
+  const salt = await getDailySalt(supabase, site.timezone || "UTC");
   const visitorHash = computeVisitorHash(salt, site.id, ip, userAgent ?? "");
 
   const now = new Date();

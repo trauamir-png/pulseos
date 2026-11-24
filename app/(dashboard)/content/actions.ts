@@ -745,7 +745,11 @@ export async function updateStatusSnapshot(siteId: string, id: string, input: St
   await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
 }
 
-export async function setStatusSnapshotStatus(siteId: string, id: string, status: "draft" | "published") {
+export async function setStatusSnapshotStatus(
+  siteId: string,
+  id: string,
+  status: "draft" | "published",
+): Promise<{ websiteRefreshed: boolean }> {
   const supabase = await createClient();
   await requireSiteAccess(supabase, siteId);
   await requirePermission(supabase, siteId, PERMISSIONS.CONTENT_STATUS_SNAPSHOTS_MANAGE);
@@ -760,7 +764,8 @@ export async function setStatusSnapshotStatus(siteId: string, id: string, status
   if (error) throw new Error(error.message);
 
   revalidateContent();
-  await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+  const websiteRefreshed = await revalidateWebsite(supabase, siteId, ["status-snapshot"]);
+  return { websiteRefreshed };
 }
 
 export async function deleteStatusSnapshot(siteId: string, id: string) {

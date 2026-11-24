@@ -26,6 +26,7 @@ export function StatusSnapshotForm({
   const [headline, setHeadline] = useState(item?.headline ?? "");
   const [body, setBody] = useState(item?.body ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: "success" | "warning"; text: string } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [statusPending, startStatusTransition] = useTransition();
@@ -51,9 +52,24 @@ export function StatusSnapshotForm({
   function handleTogglePublish() {
     if (!item) return;
     setError(null);
+    setNotice(null);
+    const nextStatus = item.status === "published" ? "draft" : "published";
     startStatusTransition(async () => {
       try {
-        await setStatusSnapshotStatus(siteId, item.id, item.status === "published" ? "draft" : "published");
+        const { websiteRefreshed } = await setStatusSnapshotStatus(siteId, item.id, nextStatus);
+        if (nextStatus === "published") {
+          setNotice(
+            websiteRefreshed
+              ? { type: "success", text: "הפרסום בוצע בהצלחה." }
+              : { type: "warning", text: "התוכן פורסם בהצלחה, אך רענון האתר נכשל. ייתכן שהעדכון יופיע באיחור." },
+          );
+        } else {
+          setNotice(
+            websiteRefreshed
+              ? { type: "success", text: "הסטטוס עודכן בהצלחה." }
+              : { type: "warning", text: "הסטטוס עודכן בהצלחה במסד הנתונים, אך רענון האתר נכשל. ייתכן שהעדכון יופיע באיחור." },
+          );
+        }
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "עדכון הסטטוס נכשל.");
@@ -92,6 +108,9 @@ export function StatusSnapshotForm({
       <div className="space-y-4">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
           {error && <p className="text-sm text-[var(--negative)]">{error}</p>}
+          {notice && (
+            <p className={`text-sm ${notice.type === "success" ? "text-green-700" : "text-amber-700"}`}>{notice.text}</p>
+          )}
           <button
             onClick={handleSave}
             disabled={pending}
